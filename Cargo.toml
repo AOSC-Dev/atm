@@ -1,5 +1,5 @@
 [package]
-name = "topic-manager"
+name = "atm"
 version = "0.1.0"
 authors = ["liushuyu <liushuyu011@gmail.com>"]
 edition = "2018"
