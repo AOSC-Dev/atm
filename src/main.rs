@@ -11,7 +11,7 @@ mod network;
 mod parser;
 mod pm;
 
-const DEFAULT_MANIFEST_URL: &str = "http://localhost:8080/debs/manifest/topics.json";
+const DEFAULT_MANIFEST_URL: &str = "https://repo.aosc.io/debs/manifest/topics.json";
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 enum TopicColumn {

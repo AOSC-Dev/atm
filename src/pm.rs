@@ -28,21 +28,6 @@ pub struct PreviousTopic {
 
 type PreviousTopics = Vec<PreviousTopic>;
 
-pub fn get_closed_topic(current: &TopicManifests) -> Result<PreviousTopics> {
-    let mut current_topics: HashSet<String> = HashSet::new();
-    let mut closed_topics = Vec::new();
-    for topic in current {
-        current_topics.insert(topic.name.clone());
-    }
-    for topic in get_previous_topics()? {
-        if !current_topics.contains(&topic.name) {
-            closed_topics.push(topic);
-        }
-    }
-
-    Ok(closed_topics)
-}
-
 /// Returns the packages need to be reinstalled
 pub fn close_topics(topics: &TopicManifests) -> Result<Vec<String>> {
     let state_file = fs::read(DPKG_STATE)?;
