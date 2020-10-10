@@ -1,0 +1,22 @@
+[package]
+name = "topic-manager"
+version = "0.1.0"
+authors = ["liushuyu <liushuyu011@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0"
+chrono = "0.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+log = "0.4"
+clap = "2.33"
+reqwest = { version = "0.10", features = ["json", "blocking"] }
+nom = "5.1"
+cursive = "0.15"
+cursive_table_view = { git = "https://github.com/BonsaiDen/cursive_table_view" }
+
+[profile.release]
+lto = true
