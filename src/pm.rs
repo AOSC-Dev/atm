@@ -29,7 +29,7 @@ pub struct PreviousTopic {
 type PreviousTopics = Vec<PreviousTopic>;
 
 /// Returns the packages need to be reinstalled
-pub fn close_topics(topics: &TopicManifests) -> Result<Vec<String>> {
+pub fn close_topics(topics: &[TopicManifest]) -> Result<Vec<String>> {
     let state_file = fs::read(DPKG_STATE)?;
     let installed = list_installed(&state_file)?;
     let mut remove = Vec::new();
@@ -52,7 +52,7 @@ fn get_previous_topics() -> Result<PreviousTopics> {
 }
 
 pub fn get_display_listing(current: TopicManifests) -> TopicManifests {
-    let prev = get_previous_topics().unwrap_or(vec![]);
+    let prev = get_previous_topics().unwrap_or_default();
     let mut lookup: HashMap<String, TopicManifest> = HashMap::new();
     let current_len = current.len();
 
@@ -118,12 +118,12 @@ fn make_topic_list(topics: &[&TopicManifest]) -> String {
 
 pub fn write_source_list(topics: &[&TopicManifest]) -> Result<()> {
     let mut f = std::fs::File::create(SOURCE_PATH)?;
-    f.write(SOURCE_HEADER)?;
-    f.write(make_topic_list(topics).as_bytes())?;
+    f.write_all(SOURCE_HEADER)?;
+    f.write_all(make_topic_list(topics).as_bytes())?;
 
     std::fs::create_dir_all(STATE_DIR)?;
     let mut f = std::fs::File::create(STATE_PATH)?;
-    f.write(save_as_previous_topics(topics)?.as_bytes())?;
+    f.write_all(save_as_previous_topics(topics)?.as_bytes())?;
 
     Ok(())
 }

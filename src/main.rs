@@ -39,7 +39,7 @@ impl TableViewItem<TopicColumn> for network::TopicManifest {
                 name
             }
             TopicColumn::Date => Utc.timestamp(self.date, 0).format("%Y-%m-%d").to_string(),
-            TopicColumn::Description => self.description.clone().unwrap_or(String::new()),
+            TopicColumn::Description => self.description.clone().unwrap_or_default(),
         }
     }
     fn cmp(&self, other: &Self, column: TopicColumn) -> std::cmp::Ordering
@@ -152,7 +152,7 @@ fn fetch_manifest(siv: &mut Cursive) {
             Err(e) => Err(e),
         }
     });
-    let has_closed = filtered.iter().find(|x| x.closed).is_some();
+    let has_closed = filtered.iter().any(|x| x.closed);
     siv.set_user_data(filtered.clone());
     siv.refresh();
     let view = TableView::<network::TopicManifest, TopicColumn>::new()

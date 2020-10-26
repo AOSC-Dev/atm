@@ -41,7 +41,7 @@ pub fn fetch_topics(url: &str) -> Result<TopicManifests> {
 pub fn filter_topics(topics: TopicManifests) -> Result<TopicManifests> {
     let mut filtered: TopicManifests = Vec::new();
     filtered.reserve(topics.len());
-    let arch = get_arch_name().ok_or(anyhow!("unknown architecture"))?;
+    let arch = get_arch_name().ok_or_else(|| anyhow!("unknown architecture"))?;
 
     for topic in topics {
         if topic.arch.contains("all") || topic.arch.contains(arch) {
