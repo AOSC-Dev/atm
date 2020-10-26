@@ -117,11 +117,13 @@ fn commit_changes(siv: &mut Cursive) {
                     }
                 }
             }
-            tx.send(pm::write_source_list(&enabled)).ok();
+            tx.send((pm::write_source_list(&enabled), items.clone()))
+                .ok();
         },
     );
-    let result = unwrap_or_show_error!(siv, { rx.recv_timeout(Duration::from_secs(10)) });
+    let (result, items) = unwrap_or_show_error!(siv, { rx.recv_timeout(Duration::from_secs(10)) });
     unwrap_or_show_error!(siv, { result });
+    siv.set_user_data(items);
     let install_cmd: Vec<String> = unwrap_or_show_error!(siv, { pm::close_topics(&reinstall) });
 
     siv.add_layer(
@@ -151,6 +153,7 @@ fn fetch_manifest(siv: &mut Cursive) {
         }
     });
     let has_closed = filtered.iter().find(|x| x.closed).is_some();
+    siv.set_user_data(filtered.clone());
     siv.refresh();
     let view = TableView::<network::TopicManifest, TopicColumn>::new()
         .column(TopicColumn::Enabled, "", |c| {
@@ -201,21 +204,22 @@ fn main() {
         let dump = siv.take_user_data::<(Vec<String>, cursive::Dump)>();
         if let Some((reinstall, dump)) = dump {
             drop(siv);
-            println!("Refreshing APT databases ...");
+            println!("\x1b[1mRefreshing APT databases ...\x1b[0m");
             std::process::Command::new("apt")
                 .arg("update")
                 .status()
                 .unwrap();
             if !reinstall.is_empty() {
-                println!("Reverting packages to stable ...");
+                println!("\n\x1b[1mReverting packages to stable ...\x1b[0m");
                 std::process::Command::new("apt")
                     .arg("install")
                     .arg("-y")
+                    .arg("--allow-downgrades")
                     .args(&reinstall)
                     .status()
                     .unwrap();
             }
-            println!("Please upgrade your system: \n");
+            println!("\n\x1b[1mPlease upgrade your system:\x1b[0m");
             std::process::Command::new("apt")
                 .arg("full-upgrade")
                 .status()
