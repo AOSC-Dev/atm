@@ -65,7 +65,10 @@ pub fn extract_all_names(input: &[u8]) -> IResult<&[u8], Vec<&[u8]>> {
 pub fn list_installed(input: &[u8]) -> Result<HashSet<String>> {
     let names = extract_all_names(input);
     let mut result: HashSet<String> = HashSet::new();
-    for name in names.map_err(|_| anyhow!("Failed to parse dpkg status file"))?.1 {
+    for name in names
+        .map_err(|_| anyhow!("Failed to parse dpkg status file"))?
+        .1
+    {
         if name.is_empty() {
             continue;
         }

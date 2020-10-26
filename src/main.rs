@@ -180,7 +180,7 @@ fn fetch_manifest(siv: &mut Cursive) {
         .scrollable();
 
     let mut top_view = LinearLayout::vertical();
-    top_view.add_child(TextView::new("Here below is a list of active update topics available for early adoption.\nSelect one or more topic to enroll in update testing, deselect to withdraw and rollback to stable packages."));
+    top_view.add_child(TextView::new("Here below is a list of active update topics available for early adoption.\nSelect one or more topic to enroll in update testing, deselect to withdraw and rollback to stable packages.\nUse arrow keys to navigate and use Enter to select/deselect."));
     top_view.add_child(DummyView {});
     if has_closed {
         top_view.add_child(TextView::new("Closed/graduated topics detected, ATM will refresh all packages affected by these topics with versions found in the stable repository."));
