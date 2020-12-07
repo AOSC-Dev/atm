@@ -1,17 +1,21 @@
+use std::fs::File;
+use std::io::Read;
 use std::sync::mpsc;
 use std::time::Duration;
 use std::{cmp::Ordering, collections::HashSet};
 
+use anyhow::{ format_err, Result };
 use chrono::prelude::*;
 use cursive::{align::HAlign, traits::*, views::DummyView, views::LinearLayout};
 use cursive::{views::Dialog, views::TextView, Cursive};
 use cursive_table_view::{TableView, TableViewItem};
+use lazy_static::lazy_static;
+use serde_json::Value as jsonValue;
+use serde_yaml::Value as yamlValue;
 
 mod network;
 mod parser;
 mod pm;
-
-const DEFAULT_MANIFEST_URL: &str = "https://repo.aosc.io/debs/manifest/topics.json";
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 enum TopicColumn {
@@ -71,6 +75,42 @@ macro_rules! unwrap_or_show_error {
         }
         $x.unwrap()
     }};
+}
+
+fn get_mirror_url() -> Result<String> {
+    let mut status_file = File::open("/var/lib/apt/gen/status.json")?;
+    let mut status_data = String::new();
+    status_file.read_to_string(&mut status_data)?;
+
+    let status_v: jsonValue = serde_json::from_str(&status_data)?;
+    let mirror: String = match &status_v["mirror"][0] {
+        jsonValue::String(m) => String::from(m),
+        _ => {
+            return Err(format_err!("Malformed apt-gen-list data."));
+        }
+    };
+
+    let mut mirrors_file = File::open("/usr/share/distro-repository-data/mirrors.yml")?;
+    let mut mirrors_data = String::new();
+    mirrors_file.read_to_string(&mut mirrors_data)?;
+
+    let mirrors_v: yamlValue = serde_yaml::from_str(&mirrors_data)?;
+    let mirror_url = match &mirrors_v[&mirror]["url"] {
+        yamlValue::String(u) => String::from(u),
+        _ => {
+            return Err(format_err!("Malformed mirrors data."));
+        }
+    };
+
+    Ok(mirror_url)
+}
+
+lazy_static! {
+    static ref DEFAULT_MANIFEST_URL: String = format!(
+        "{}{}",
+        get_mirror_url().unwrap_or(String::from("https://repo.aosc.io/")),
+        "debs/manifest/topics.json"
+    );
 }
 
 fn show_blocking_message(siv: &mut Cursive, msg: &str) {
@@ -144,7 +184,7 @@ fn fetch_manifest(siv: &mut Cursive) {
     show_blocking_message(siv, "Fetching manifest...");
     siv.refresh();
     siv.step();
-    let manifest = unwrap_or_show_error!(siv, { network::fetch_topics(DEFAULT_MANIFEST_URL) });
+    let manifest = unwrap_or_show_error!(siv, { network::fetch_topics(&DEFAULT_MANIFEST_URL) });
     let filtered = unwrap_or_show_error!(siv, {
         let topics = network::filter_topics(manifest);
         match topics {
