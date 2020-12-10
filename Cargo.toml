@@ -1,6 +1,6 @@
 [package]
 name = "atm"
-version = "0.1.5"
+version = "0.2.0"
 authors = ["liushuyu <liushuyu011@gmail.com>"]
 edition = "2018"
 
