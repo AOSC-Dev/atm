@@ -1,7 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     fs,
-    io::{Read, Write},
+    io::Write,
 };
 
 use crate::network::{TopicManifest, TopicManifests};
@@ -18,6 +18,7 @@ const STATE_DIR: &str = "/var/lib/atm/";
 const DPKG_STATE: &str = "/var/lib/dpkg/status";
 const APT_GEN_LIST_STATUS: &str = "/var/lib/apt/gen/status.json";
 const MIRRORS_DATA: &str = "/usr/share/distro-repository-data/mirrors.yml";
+const DEFAULT_REPO_URL: &str = "https://repo.aosc.io";
 
 #[derive(Deserialize, Debug)]
 struct AptGenListStatus {
@@ -30,36 +31,27 @@ struct Mirror {
 }
 
 pub fn get_mirror_url() -> Result<String> {
-    let mut status_file = fs::File::open(APT_GEN_LIST_STATUS)?;
-    let mut status_data = String::new();
-    status_file.read_to_string(&mut status_data)?;
-
-    let status_v: AptGenListStatus = serde_json::from_str(&status_data)?;
+    let status_data = fs::read(APT_GEN_LIST_STATUS)?;
+    let status_data: AptGenListStatus = serde_json::from_slice(&status_data)?;
     let mirror;
-    if let Some(m) = &status_v.mirror.get(0) {
+    if let Some(m) = status_data.mirror.get(0) {
         mirror = m.to_string();
     } else {
         mirror = "origin".to_string();
     }
 
-    let mut mirrors_file = fs::File::open(MIRRORS_DATA)?;
-    let mut mirrors_data = String::new();
-    mirrors_file.read_to_string(&mut mirrors_data)?;
-
-    let mirrors_v: HashMap<String, Mirror> = serde_yaml::from_str(&mirrors_data)?;
-    let mirror_url;
-    if let Some(m) = &mirrors_v.get(&mirror) {
-        mirror_url = m.url.to_string();
-    } else {
-        mirror_url = "https://repo.aosc.io/".to_string();
+    let mirrors_data = fs::read(MIRRORS_DATA)?;
+    let mirror_data: HashMap<String, Mirror> = serde_yaml::from_slice(&mirrors_data)?;
+    if let Some(mirror) = mirror_data.get(&mirror) {
+        return Ok(mirror.url.to_string());
     }
 
-    Ok(mirror_url)
+    Ok(DEFAULT_REPO_URL.to_string())
 }
 
 lazy_static! {
     pub static ref MIRROR_URL: String =
-        get_mirror_url().unwrap_or("https://repo.aosc.io/".to_string());
+        get_mirror_url().unwrap_or_else(|_| "https://repo.aosc.io/".to_string());
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -91,7 +83,7 @@ pub fn close_topics(topics: &[TopicManifest]) -> Result<Vec<String>> {
 }
 
 fn get_previous_topics() -> Result<PreviousTopics> {
-    let f = std::fs::read(STATE_PATH)?;
+    let f = fs::read(STATE_PATH)?;
 
     Ok(from_slice(&f)?)
 }
@@ -164,12 +156,12 @@ fn make_topic_list(topics: &[&TopicManifest]) -> String {
 }
 
 pub fn write_source_list(topics: &[&TopicManifest]) -> Result<()> {
-    let mut f = std::fs::File::create(SOURCE_PATH)?;
+    let mut f = fs::File::create(SOURCE_PATH)?;
     f.write_all(SOURCE_HEADER)?;
     f.write_all(make_topic_list(topics).as_bytes())?;
 
-    std::fs::create_dir_all(STATE_DIR)?;
-    let mut f = std::fs::File::create(STATE_PATH)?;
+    fs::create_dir_all(STATE_DIR)?;
+    let mut f = fs::File::create(STATE_PATH)?;
     f.write_all(save_as_previous_topics(topics)?.as_bytes())?;
 
     Ok(())
