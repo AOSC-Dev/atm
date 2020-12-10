@@ -11,8 +11,6 @@ mod network;
 mod parser;
 mod pm;
 
-const DEFAULT_MANIFEST_URL: &str = "https://repo.aosc.io/debs/manifest/topics.json";
-
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 enum TopicColumn {
     Enabled,
@@ -144,7 +142,13 @@ fn fetch_manifest(siv: &mut Cursive) {
     show_blocking_message(siv, "Fetching manifest...");
     siv.refresh();
     siv.step();
-    let manifest = unwrap_or_show_error!(siv, { network::fetch_topics(DEFAULT_MANIFEST_URL) });
+    let manifest = unwrap_or_show_error!(siv, {
+        network::fetch_topics(&format!(
+            "{}{}",
+            pm::MIRROR_URL.to_string(),
+            "debs/manifest/topics.json"
+        ))
+    });
     let filtered = unwrap_or_show_error!(siv, {
         let topics = network::filter_topics(manifest);
         match topics {

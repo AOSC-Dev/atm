@@ -1,12 +1,13 @@
 use std::{
     collections::{HashMap, HashSet},
     fs,
-    io::Write,
+    io::{Read, Write},
 };
 
 use crate::network::{TopicManifest, TopicManifests};
 use crate::parser::list_installed;
 use anyhow::Result;
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_slice, to_string};
 
@@ -15,7 +16,51 @@ const SOURCE_PATH: &str = "/etc/apt/sources.list.d/atm.list";
 const STATE_PATH: &str = "/var/lib/atm/state";
 const STATE_DIR: &str = "/var/lib/atm/";
 const DPKG_STATE: &str = "/var/lib/dpkg/status";
-const MIRROR_URL: &str = "https://repo.aosc.io/debs";
+const APT_GEN_LIST_STATUS: &str = "/var/lib/apt/gen/status.json";
+const MIRRORS_DATA: &str = "/usr/share/distro-repository-data/mirrors.yml";
+
+#[derive(Deserialize, Debug)]
+struct AptGenListStatus {
+    mirror: Vec<String>,
+}
+
+#[derive(Deserialize, Debug)]
+struct Mirror {
+    url: String,
+}
+
+pub fn get_mirror_url() -> Result<String> {
+    let mut status_file = fs::File::open(APT_GEN_LIST_STATUS)?;
+    let mut status_data = String::new();
+    status_file.read_to_string(&mut status_data)?;
+
+    let status_v: AptGenListStatus = serde_json::from_str(&status_data)?;
+    let mirror;
+    if let Some(m) = &status_v.mirror.get(0) {
+        mirror = m.to_string();
+    } else {
+        mirror = "origin".to_string();
+    }
+
+    let mut mirrors_file = fs::File::open(MIRRORS_DATA)?;
+    let mut mirrors_data = String::new();
+    mirrors_file.read_to_string(&mut mirrors_data)?;
+
+    let mirrors_v: HashMap<String, Mirror> = serde_yaml::from_str(&mirrors_data)?;
+    let mirror_url;
+    if let Some(m) = &mirrors_v.get(&mirror) {
+        mirror_url = m.url.to_string();
+    } else {
+        mirror_url = "https://repo.aosc.io/".to_string();
+    }
+
+    Ok(mirror_url)
+}
+
+lazy_static! {
+    pub static ref MIRROR_URL: String =
+        get_mirror_url().unwrap_or("https://repo.aosc.io/".to_string());
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PreviousTopic {
@@ -109,7 +154,9 @@ fn make_topic_list(topics: &[&TopicManifest]) -> String {
     for topic in topics {
         output.push_str(&format!(
             "# Topic `{}`\ndeb {} {} main\n",
-            topic.name, MIRROR_URL, topic.name
+            topic.name,
+            format!("{}{}", MIRROR_URL.to_string(), "debs"),
+            topic.name
         ));
     }
 
