@@ -16,6 +16,8 @@ const SOURCE_PATH: &str = "/etc/apt/sources.list.d/atm.list";
 const STATE_PATH: &str = "/var/lib/atm/state";
 const STATE_DIR: &str = "/var/lib/atm/";
 const DPKG_STATE: &str = "/var/lib/dpkg/status";
+const APT_GEN_LIST_STATUS: &str = "/var/lib/apt/gen/status.json";
+const MIRRORS_DATA: &str = "/usr/share/distro-repository-data/mirrors.yml";
 
 #[derive(Deserialize, Debug)]
 struct AptGenListStatus {
@@ -27,41 +29,36 @@ struct Mirror {
     url: String,
 }
 
-#[derive(Deserialize, Debug)]
-struct Mirrors {
-    mirror: HashMap<String, Mirror>,
-}
-
 pub fn get_mirror_url() -> Result<String> {
-    let mut status_file = fs::File::open("/var/lib/apt/gen/status.json")?;
+    let mut status_file = fs::File::open(APT_GEN_LIST_STATUS)?;
     let mut status_data = String::new();
     status_file.read_to_string(&mut status_data)?;
 
     let status_v: AptGenListStatus = serde_json::from_str(&status_data)?;
-    let mut mirror = String::from("origin");
+    let mirror;
     if let Some(m) = &status_v.mirror.get(0) {
         mirror = m.to_string();
+    } else {
+        mirror = "origin".to_string();
     }
 
-    let mut mirrors_file = fs::File::open("/usr/share/distro-repository-data/mirrors.yml")?;
+    let mut mirrors_file = fs::File::open(MIRRORS_DATA)?;
     let mut mirrors_data = String::new();
     mirrors_file.read_to_string(&mut mirrors_data)?;
 
-    let mirrors_v: Mirrors = serde_yaml::from_str(&mirrors_data)?;
-    let mut mirror_url = String::from("https://repo.aosc.io/");
-    if let Some(m) = &mirrors_v.mirror.get(&mirror) {
+    let mirrors_v: HashMap<String, Mirror> = serde_yaml::from_str(&mirrors_data)?;
+    let mirror_url;
+    if let Some(m) = &mirrors_v.get(&mirror) {
         mirror_url = m.url.to_string();
+    } else {
+        mirror_url = "https://repo.aosc.io/".to_string();
     }
 
     Ok(mirror_url)
 }
 
 lazy_static! {
-    static ref MIRROR_URL: String = format!(
-        "{}{}",
-        get_mirror_url().unwrap_or(String::from("https://repo.aosc.io/")),
-        "debs"
-    );
+    pub static ref MIRROR_URL: String = get_mirror_url().unwrap_or("https://repo.aosc.io/".to_string());
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -156,7 +153,13 @@ fn make_topic_list(topics: &[&TopicManifest]) -> String {
     for topic in topics {
         output.push_str(&format!(
             "# Topic `{}`\ndeb {} {} main\n",
-            topic.name, *MIRROR_URL, topic.name
+            topic.name,
+            format!(
+                "{}{}",
+                MIRROR_URL.to_string(),
+                "debs"
+            ),
+            topic.name
         ));
     }
 

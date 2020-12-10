@@ -145,7 +145,7 @@ fn fetch_manifest(siv: &mut Cursive) {
     let manifest = unwrap_or_show_error!(siv, {
         network::fetch_topics(&format!(
             "{}{}",
-            pm::get_mirror_url().unwrap_or(String::from("https://repo.aosc.io/")),
+            pm::MIRROR_URL.to_string(),
             "debs/manifest/topics.json"
         ))
     });
