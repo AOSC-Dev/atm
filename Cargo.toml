@@ -15,7 +15,7 @@ serde_yaml = "0.8"
 lazy_static = "1.4"
 log = "0.4"
 clap = "2.33"
-reqwest = { version = "0.10", features = ["json", "blocking"] }
+reqwest = { version = "0.11", features = ["json", "blocking"] }
 nom = "6.0"
 cursive = { version = "0.15", features = ["crossterm-backend"], default-features = false }
 cursive_table_view = { git = "https://github.com/BonsaiDen/cursive_table_view" }
