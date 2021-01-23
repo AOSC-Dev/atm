@@ -4,7 +4,7 @@ use std::{cmp::Ordering, collections::HashSet};
 
 use chrono::prelude::*;
 use cursive::{align::HAlign, traits::*, views::DummyView, views::LinearLayout};
-use cursive::{views::Dialog, views::TextView, Cursive};
+use cursive::{views::Dialog, views::TextView, Cursive, CursiveRunner};
 use cursive_table_view::{TableView, TableViewItem};
 
 mod network;
@@ -138,10 +138,9 @@ fn commit_changes(siv: &mut Cursive) {
     siv.set_user_data((install_cmd, dump));
 }
 
-fn fetch_manifest(siv: &mut Cursive) {
+fn fetch_manifest(siv: &mut CursiveRunner<&mut Cursive>) {
     show_blocking_message(siv, "Fetching manifest...");
     siv.refresh();
-    siv.step();
     let manifest = unwrap_or_show_error!(siv, {
         network::fetch_topics(&format!(
             "{}{}",
@@ -201,7 +200,7 @@ fn fetch_manifest(siv: &mut Cursive) {
 
 fn main() {
     let mut siv = cursive::default();
-    fetch_manifest(&mut siv);
+    fetch_manifest(&mut siv.runner());
     siv.run();
 
     loop {
