@@ -16,7 +16,7 @@ lazy_static = "1.4"
 log = "0.4"
 clap = "2.33"
 reqwest = { version = "0.11", features = ["json", "blocking"] }
-nom = "6.0"
+nom = "6.1"
 cursive = { version = "0.16", features = ["crossterm-backend"], default-features = false }
 cursive_table_view = { git = "https://github.com/BonsaiDen/cursive_table_view" }
 
