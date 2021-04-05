@@ -7,9 +7,12 @@ use cursive::{align::HAlign, traits::*, views::DummyView, views::LinearLayout};
 use cursive::{views::Dialog, views::TextView, Cursive, CursiveRunner};
 use cursive_table_view::{TableView, TableViewItem};
 
+mod i18n;
 mod network;
 mod parser;
 mod pm;
+
+use i18n::I18N_LOADER;
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 enum TopicColumn {
@@ -32,7 +35,8 @@ impl TableViewItem<TopicColumn> for network::TopicManifest {
             TopicColumn::Name => {
                 let mut name = self.name.clone();
                 if self.closed {
-                    name.push_str(" [closed]");
+                    name.push(' ');
+                    name.push_str(&fl!("closed"));
                 }
                 name
             }
@@ -74,7 +78,7 @@ macro_rules! unwrap_or_show_error {
 fn show_blocking_message(siv: &mut Cursive, msg: &str) {
     siv.add_layer(
         Dialog::around(TextView::new(msg))
-            .title("Message")
+            .title(fl!("message"))
             .padding_lrtb(2, 2, 1, 1),
     );
 }
@@ -82,8 +86,8 @@ fn show_blocking_message(siv: &mut Cursive, msg: &str) {
 fn show_error(siv: &mut Cursive, msg: &str) {
     siv.add_layer(
         Dialog::around(TextView::new(msg))
-            .title("Error")
-            .button("Exit", |s| s.quit())
+            .title(fl!("error"))
+            .button(fl!("exit"), |s| s.quit())
             .padding_lrtb(2, 2, 1, 1),
     );
 }
@@ -125,9 +129,9 @@ fn commit_changes(siv: &mut Cursive) {
     let install_cmd: Vec<String> = unwrap_or_show_error!(siv, { pm::close_topics(&reinstall) });
 
     siv.add_layer(
-        Dialog::around(TextView::new("APT configuration updated successfully."))
-            .title("Message")
-            .button("OK", |s| {
+        Dialog::around(TextView::new(fl!("apt_finished")))
+            .title(fl!("message"))
+            .button(fl!("ok"), |s| {
                 s.pop_layer();
             })
             .padding_lrtb(2, 2, 1, 1),
@@ -139,7 +143,7 @@ fn commit_changes(siv: &mut Cursive) {
 }
 
 fn fetch_manifest(siv: &mut CursiveRunner<&mut Cursive>) {
-    show_blocking_message(siv, "Fetching manifest...");
+    show_blocking_message(siv, &fl!("refresh_manifest"));
     siv.refresh();
     let manifest = unwrap_or_show_error!(siv, {
         network::fetch_topics(&format!(
@@ -162,9 +166,11 @@ fn fetch_manifest(siv: &mut CursiveRunner<&mut Cursive>) {
         .column(TopicColumn::Enabled, "", |c| {
             c.align(HAlign::Center).width(4)
         })
-        .column(TopicColumn::Name, "Name", |c| c.ordering(Ordering::Greater))
-        .column(TopicColumn::Date, "Date", |c| c)
-        .column(TopicColumn::Description, "Description", |c| c)
+        .column(TopicColumn::Name, fl!("name"), |c| {
+            c.ordering(Ordering::Greater)
+        })
+        .column(TopicColumn::Date, fl!("date"), |c| c)
+        .column(TopicColumn::Description, fl!("description"), |c| c)
         .items(filtered)
         .on_submit(|siv, _, index| {
             siv.call_on_name(
@@ -183,17 +189,17 @@ fn fetch_manifest(siv: &mut CursiveRunner<&mut Cursive>) {
         .scrollable();
 
     let mut top_view = LinearLayout::vertical();
-    top_view.add_child(TextView::new("Here below is a list of active update topics available for early adoption.\nSelect one or more topic to enroll in update testing, deselect to withdraw and rollback to stable packages.\nUse arrow keys to navigate and use Enter to select/deselect."));
+    top_view.add_child(TextView::new(fl!("topic_selection_description")));
     top_view.add_child(DummyView {});
     if has_closed {
-        top_view.add_child(TextView::new("Closed/graduated topics detected, ATM will refresh all packages affected by these topics with versions found in the stable repository."));
+        top_view.add_child(TextView::new(fl!("topic_selection_closed_topic_warning")));
     }
     top_view.add_child(view.scroll_x(true));
     siv.add_layer(
         Dialog::around(top_view)
-            .title("Topic Selection")
-            .button("Exit", |siv| siv.quit())
-            .button("Proceed", |siv| commit_changes(siv))
+            .title(fl!("topic_selection"))
+            .button(fl!("exit"), |siv| siv.quit())
+            .button(fl!("proceed"), |siv| commit_changes(siv))
             .padding_lrtb(2, 2, 1, 1),
     );
 }
@@ -207,13 +213,13 @@ fn main() {
         let dump = siv.take_user_data::<(Vec<String>, cursive::Dump)>();
         if let Some((reinstall, dump)) = dump {
             drop(siv);
-            println!("\x1b[1mRefreshing APT databases ...\x1b[0m");
+            println!("\x1b[1m{}\x1b[0m", fl!("refresh_apt"));
             std::process::Command::new("apt")
                 .arg("update")
                 .status()
                 .unwrap();
             if !reinstall.is_empty() {
-                println!("\n\x1b[1mReverting packages to stable ...\x1b[0m");
+                println!("\n\x1b[1m{}\x1b[0m", fl!("revert_apt"));
                 std::process::Command::new("apt")
                     .arg("install")
                     .arg("-y")
@@ -222,7 +228,7 @@ fn main() {
                     .status()
                     .unwrap();
             }
-            println!("\n\x1b[1mPlease upgrade your system:\x1b[0m");
+            println!("\n\x1b[1m{}\x1b[0m", fl!("upgrade_prompt"));
             std::process::Command::new("apt")
                 .arg("full-upgrade")
                 .status()
