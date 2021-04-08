@@ -17,12 +17,12 @@ refresh_apt = 正在刷新 APT 数据库……
 revert_apt = 正在回滚软件包到稳定版本……
 upgrade_prompt = 请更新您的系统：
 
-exe_download = [{$curr}/{$total}] 正在下载 {$name}……
-exe_verify = [{$curr}/{$total}] 正在校验 {$name}……
-exe_download_file_error = Download failed: {$name}
-exe_download_error = Unable to download files
-exe_verify_error = Verification failed: {$name}
-exe_path_error = Filename unknown: {$name}
-exe_batch_error = Failed to download packages
+exe_download = [{$curr}/{$total}] 正在下载 {$name} ……
+exe_verify = [{$curr}/{$total}] 正在校验 {$name} ……
+exe_download_file_error = 无法下载：{$name}
+exe_download_error = 无法下载文件
+exe_verify_error = 校验出错：{$name}
+exe_path_error = 未知文件名：{$name}
+exe_batch_error = 无法下载软件包
 
 apt_finished = APT 配置信息更新成功。
