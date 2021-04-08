@@ -11,8 +11,10 @@ mod i18n;
 mod network;
 mod parser;
 mod pm;
+mod solv;
 
 use i18n::I18N_LOADER;
+use solv::{PackageMeta, Pool};
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 enum TopicColumn {
@@ -92,6 +94,32 @@ fn show_error(siv: &mut Cursive, msg: &str) {
     );
 }
 
+fn show_info(siv: &mut Cursive, msg: &str) {
+    siv.add_layer(
+        Dialog::around(TextView::new(msg))
+            .title(fl!("message"))
+            .button(fl!("ok"), |s| {
+                s.pop_layer();
+            })
+            .padding_lrtb(2, 2, 1, 1),
+    );
+}
+
+fn show_tx_details(siv: &mut Cursive, meta: &[PackageMeta]) {
+    siv.add_layer(
+        Dialog::around(
+            TextView::new(pm::get_task_details(meta))
+                .scrollable()
+                .scroll_y(true),
+        )
+        .title(fl!("tx_title"))
+        .button(fl!("ok"), |s| {
+            s.pop_layer();
+        })
+        .padding_lrtb(2, 2, 1, 1),
+    );
+}
+
 fn commit_changes(siv: &mut Cursive) {
     let mut previous: Option<Vec<network::TopicManifest>> = None;
     if let Some(prev) = siv.user_data::<Vec<network::TopicManifest>>() {
@@ -125,21 +153,62 @@ fn commit_changes(siv: &mut Cursive) {
     );
     let (result, items) = unwrap_or_show_error!(siv, { rx.recv_timeout(Duration::from_secs(10)) });
     unwrap_or_show_error!(siv, { result });
-    siv.set_user_data(items);
-    let install_cmd: Vec<String> = unwrap_or_show_error!(siv, { pm::close_topics(&reinstall) });
+    show_blocking_message(siv, &fl!("refresh_apt"));
+    let mut enabled: Vec<network::TopicManifest> =
+        items.clone().into_iter().filter(|x| x.enabled).collect();
+    enabled.push(network::TopicManifest {
+        enabled: true,
+        closed: true,
+        name: "stable".to_string(),
+        description: None,
+        date: 0,
+        arch: HashSet::new(),
+        packages: Vec::new(),
+    });
+    let mut pool = Pool::new();
+    let t = unwrap_or_show_error!(siv, { pm::switch_topics(&mut pool, &enabled, &reinstall) });
+    let size_change = t.get_size_change();
+    let metadata = unwrap_or_show_error!(siv, { t.create_metadata() });
+    siv.pop_layer();
+    if metadata.is_empty() {
+        show_info(siv, &fl!("nothing"));
+        return;
+    }
+    let human_size = bytesize::ByteSize::kb(size_change.abs() as u64);
+    let mut summary = pm::get_task_summary(&metadata);
+    summary.push('\n');
+    if size_change > 0 {
+        summary += &fl!("disk_space_decrease", size = human_size.to_string());
+    } else {
+        summary += &fl!("disk_space_increase", size = human_size.to_string());
+    }
+    let metadata_clone = metadata.clone();
 
     siv.add_layer(
-        Dialog::around(TextView::new(fl!("apt_finished")))
+        Dialog::around(TextView::new(summary))
             .title(fl!("message"))
-            .button(fl!("ok"), |s| {
+            .button(fl!("exit"), |s| {
                 s.pop_layer();
+            })
+            .button(fl!("details"), move |s| show_tx_details(s, &metadata_clone))
+            .button(fl!("proceed"), move |s| {
+                s.pop_layer();
+                s.add_layer(
+                    Dialog::around(TextView::new(fl!("apt_finished")))
+                        .title(fl!("message"))
+                        .button(fl!("ok"), |s| {
+                            s.pop_layer();
+                        })
+                        .padding_lrtb(2, 2, 1, 1),
+                );
+                // save and quit the current cursive session
+                let dump = s.dump();
+                s.quit();
+                s.set_user_data((metadata.clone(), dump));
             })
             .padding_lrtb(2, 2, 1, 1),
     );
-    // save and quit the current cursive session
-    let dump = siv.dump();
-    siv.quit();
-    siv.set_user_data((install_cmd, dump));
+    siv.set_user_data(items);
 }
 
 fn fetch_manifest(siv: &mut CursiveRunner<&mut Cursive>) {
@@ -210,29 +279,10 @@ fn main() {
     siv.run();
 
     loop {
-        let dump = siv.take_user_data::<(Vec<String>, cursive::Dump)>();
+        let dump = siv.take_user_data::<(Vec<PackageMeta>, cursive::Dump)>();
         if let Some((reinstall, dump)) = dump {
             drop(siv);
-            println!("\x1b[1m{}\x1b[0m", fl!("refresh_apt"));
-            std::process::Command::new("apt")
-                .arg("update")
-                .status()
-                .unwrap();
-            if !reinstall.is_empty() {
-                println!("\n\x1b[1m{}\x1b[0m", fl!("revert_apt"));
-                std::process::Command::new("apt")
-                    .arg("install")
-                    .arg("-y")
-                    .arg("--allow-downgrades")
-                    .args(&reinstall)
-                    .status()
-                    .unwrap();
-            }
-            println!("\n\x1b[1m{}\x1b[0m", fl!("upgrade_prompt"));
-            std::process::Command::new("apt")
-                .arg("full-upgrade")
-                .status()
-                .unwrap();
+
             // create a fresh Cursive instance and load previous state
             siv = cursive::default();
             siv.restore(dump);

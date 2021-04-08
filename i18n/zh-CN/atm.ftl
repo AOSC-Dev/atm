@@ -13,8 +13,20 @@ topic_selection_description = 如下是当前可用于测试的尝鲜分支列�
 topic_selection_closed_topic_warning = 检测到已关闭或已合并的尝鲜分支，ATM 将会把受影响的包回滚到稳定版本。
 
 refresh_manifest = 正在下载分支信息……
-refresh_apt = 正在刷新 APT 数据库……
-revert_apt = 正在回滚软件包到稳定版本……
-upgrade_prompt = 请更新您的系统：
+refresh_apt = Downloading packages information...
+nothing = Nothing to do.
+dpkg_error = dpkg returned error: {$status}
+install_count = {$count} packages will be installed
+erase_count = {$count} packages will be uninstalled
+update_count = {$count} packages will be upgraded or downgraded
+disk_space_decrease = After this operation, {$size} of additional disk space will be used.
+disk_space_increase = After this operation, {$size} of additional disk space will be freed.
+details = Details
+tx_title = Transaction Details
+tx_body = The following operations will be performed:
+tx_install = Install: {$package} ({$version})
+tx_upgrade = Upgrade: {$package} (To {$version})
+tx_downgrade = Downgrade: {$package} (To {$version})
+tx_erase = Erase: {$package} ({$version})
 
 apt_finished = APT 配置信息更新成功。

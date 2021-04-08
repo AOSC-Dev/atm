@@ -19,6 +19,13 @@ reqwest = { version = "0.11", features = ["json", "blocking"] }
 nom = "6.1"
 cursive = { version = "0.16", features = ["crossterm-backend"], default-features = false }
 cursive_table_view = { git = "https://github.com/BonsaiDen/cursive_table_view" }
+# libsolv related
+libsolv-sys = "0.1"
+libc = "0.2"
+hex = "0.4"
+sha2 = "0.9"
+rayon = "1.5"
+bytesize = "1.0"
 # i18n
 i18n-embed = { version = "0.12", features = ["fluent-system", "desktop-requester"]}
 i18n-embed-fl = "0.5"

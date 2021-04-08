@@ -1,8 +1,25 @@
-use std::{collections::HashSet, env::consts::ARCH};
+use std::{
+    collections::HashSet,
+    env::consts::ARCH,
+    fs::File,
+    io::Read,
+    path::{Path, PathBuf},
+    sync::{
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+        Arc, Mutex,
+    },
+    thread::sleep,
+    time::Duration,
+};
 
 use anyhow::{anyhow, Result};
-use reqwest::blocking::Client;
+use clap::crate_version;
+use rayon::prelude::*;
+use reqwest::{blocking::Client, Url};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+
+use crate::solv::PackageMeta;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TopicManifest {
@@ -19,8 +36,22 @@ pub struct TopicManifest {
 
 pub(crate) type TopicManifests = Vec<TopicManifest>;
 
+/// Calculate the Sha256 checksum of the given stream
+pub fn sha256sum<R: Read>(mut reader: R) -> Result<String> {
+    let mut hasher = Sha256::new();
+    std::io::copy(&mut reader, &mut hasher)?;
+
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn sha256sum_file(path: &Path) -> Result<String> {
+    let mut f = File::open(path)?;
+
+    sha256sum(&mut f)
+}
+
 #[inline]
-fn get_arch_name() -> Option<&'static str> {
+pub(crate) fn get_arch_name() -> Option<&'static str> {
     match ARCH {
         "x86_64" => Some("amd64"),
         "x86" => Some("i486"),
@@ -50,6 +81,139 @@ pub fn filter_topics(topics: TopicManifests) -> Result<TopicManifests> {
     }
 
     Ok(filtered)
+}
+
+pub fn make_new_client() -> Result<Client> {
+    Ok(Client::builder()
+        .user_agent(format!("ATM/{}", crate_version!()))
+        .build()?)
+}
+
+pub fn fetch_url(client: &Client, url: &str, path: &Path) -> Result<()> {
+    let mut f = File::create(path)?;
+    let mut resp = client.get(url).send()?;
+    resp.error_for_status_ref()?;
+    resp.copy_to(&mut f)?;
+
+    Ok(())
+}
+
+#[inline]
+fn combination<'a, 'b>(a: &'a [&str], b: &'b [&str]) -> Vec<(&'a str, &'b str)> {
+    let mut ret = Vec::new();
+    for i in a {
+        for j in b {
+            ret.push((*i, *j));
+        }
+    }
+
+    ret
+}
+
+pub fn fetch_manifests(
+    client: &Client,
+    mirror: &str,
+    branch: &str,
+    arches: &[&str],
+    comps: &[&str],
+) -> Result<Vec<String>> {
+    let manifests = Arc::new(Mutex::new(Vec::new()));
+    let manifests_clone = manifests.clone();
+    let combined = combination(arches, comps);
+    combined
+        .par_iter()
+        .try_for_each(move |(arch, comp)| -> Result<()> {
+            let url = format!(
+                "{}/dists/{}/{}/binary-{}/Packages",
+                mirror, branch, comp, arch
+            );
+            let parsed = Url::parse(&url)?;
+            let manifest_name = parsed.host_str().unwrap_or_default().to_string() + parsed.path();
+            let manifest_name = manifest_name.replace('/', "_");
+            let manifest_path = Path::new("/var/lib/apt/lists").join(manifest_name.clone());
+            let result = fetch_url(client, &url, &manifest_path);
+            if result.is_err() {
+                if branch == "stable" {
+                    return Err(result.unwrap_err());
+                } else {
+                    return Ok(());
+                }
+            }
+            manifests_clone
+                .lock()
+                .unwrap()
+                .push(manifest_path.to_string_lossy().to_string());
+
+            Ok(())
+        })?;
+
+    Ok(Arc::try_unwrap(manifests).unwrap().into_inner().unwrap())
+}
+
+pub fn batch_download(pkgs: &[PackageMeta], mirror: &str, root: &Path) -> Result<()> {
+    for i in 0..3 {
+        if batch_download_inner(pkgs, mirror, root).is_ok() {
+            return Ok(());
+        }
+        eprintln!("[{}/3] Retrying ...", i);
+        sleep(Duration::from_secs(2));
+    }
+
+    Err(anyhow!("Failed to download packages"))
+}
+
+fn batch_download_inner(pkgs: &[PackageMeta], mirror: &str, root: &Path) -> Result<()> {
+    let client = make_new_client()?;
+    let total = pkgs.len();
+    let count = AtomicUsize::new(0);
+    let error = AtomicBool::new(false);
+    pkgs.par_iter().for_each_init(
+        move || client.clone(),
+        |client, pkg| {
+            let filename = PathBuf::from(pkg.path.clone());
+            count.fetch_add(1, Ordering::SeqCst);
+            println!(
+                "[{}/{}] Downloading {}...",
+                count.load(Ordering::SeqCst),
+                total,
+                pkg.name
+            );
+            if let Some(filename) = filename.file_name() {
+                let path = root.join(filename);
+                if !path.is_file()
+                    && fetch_url(client, &format!("{}/{}", mirror, pkg.path), &path).is_err()
+                {
+                    error.store(true, Ordering::SeqCst);
+                    eprintln!("Download failed: {}", pkg.name);
+                    return;
+                }
+                println!(
+                    "[{}/{}] Verifying {}...",
+                    count.load(Ordering::SeqCst),
+                    total,
+                    pkg.name
+                );
+                if let Ok(checksum) = sha256sum_file(&path) {
+                    if checksum == pkg.sha256 {
+                        return;
+                    }
+                }
+                std::fs::remove_file(path).ok();
+                error.store(true, Ordering::SeqCst);
+                eprintln!("Verification failed: {}", pkg.name);
+                return;
+            } else {
+                error.store(true, Ordering::SeqCst);
+                eprintln!("Filename unknown: {}", pkg.name);
+            }
+        },
+    );
+
+    if error.load(Ordering::SeqCst) {
+        return Err(anyhow!("Unable to download files"));
+    }
+
+    Ok(())
 }
 
 #[test]

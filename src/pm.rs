@@ -2,12 +2,22 @@ use std::{
     collections::{HashMap, HashSet},
     fs,
     io::Write,
+    path::PathBuf,
+    process::Command,
 };
 
-use crate::network::{TopicManifest, TopicManifests};
-use crate::parser::list_installed;
-use anyhow::Result;
+use crate::fl;
+use crate::i18n::I18N_LOADER;
+use crate::solv::Task;
+use crate::{network::make_new_client, parser::list_installed};
+use crate::{
+    network::{fetch_manifests, get_arch_name, TopicManifest, TopicManifests},
+    solv::{calculate_deps, populate_pool, PackageAction, PackageMeta, Pool, Transaction},
+};
+use anyhow::{anyhow, Result};
 use lazy_static::lazy_static;
+use libc::c_int;
+use libsolv_sys::ffi::{SOLVER_DISTUPGRADE, SOLVER_SOLVABLE_ALL, SOLVER_UPDATE};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_slice, to_string};
 
@@ -16,6 +26,7 @@ const SOURCE_PATH: &str = "/etc/apt/sources.list.d/atm.list";
 const STATE_PATH: &str = "/var/lib/atm/state";
 const STATE_DIR: &str = "/var/lib/atm/";
 const DPKG_STATE: &str = "/var/lib/dpkg/status";
+const APT_CACHE_PATH: &str = "/var/cache/apt/archives";
 const APT_GEN_LIST_STATUS: &str = "/var/lib/apt/gen/status.json";
 const MIRRORS_DATA: &str = "/usr/share/distro-repository-data/mirrors.yml";
 const DEFAULT_REPO_URL: &str = "https://repo.aosc.io";
@@ -74,7 +85,7 @@ pub fn close_topics(topics: &[TopicManifest]) -> Result<Vec<String>> {
     for topic in topics {
         for package in topic.packages.iter() {
             if installed.contains(package) {
-                remove.push(format!("{}/stable", package));
+                remove.push(package.clone());
             }
         }
     }
@@ -163,6 +174,144 @@ pub fn write_source_list(topics: &[&TopicManifest]) -> Result<()> {
     fs::create_dir_all(STATE_DIR)?;
     let mut f = fs::File::create(STATE_PATH)?;
     f.write_all(save_as_previous_topics(topics)?.as_bytes())?;
+
+    Ok(())
+}
+
+pub fn make_resolve_request(remove: &[String]) -> Vec<Task> {
+    let mut requests = remove
+        .iter()
+        .map(|x| Task {
+            name: Some(x.clone()),
+            flags: SOLVER_DISTUPGRADE as c_int,
+        })
+        .collect::<Vec<Task>>();
+    requests.push(Task {
+        name: None,
+        flags: (SOLVER_DISTUPGRADE | SOLVER_SOLVABLE_ALL) as c_int,
+    });
+
+    requests
+}
+
+pub fn switch_topics(
+    pool: &mut Pool,
+    enabled: &[TopicManifest],
+    closed: &[TopicManifest],
+) -> Result<Transaction> {
+    let client = make_new_client()?;
+    let mut manifests = Vec::new();
+    let url = format!("{}/debs", *MIRROR_URL);
+    let arch = get_arch_name().ok_or_else(|| anyhow!(""))?;
+    for topic in enabled {
+        let result = fetch_manifests(&client, &url, &topic.name, &["all", arch], &["main"])?;
+        manifests.extend(result);
+    }
+    let manifests: Vec<PathBuf> = manifests.into_iter().map(|x| PathBuf::from(x)).collect();
+    populate_pool(pool, &manifests)?;
+    let removed = close_topics(closed)?;
+    let tasks = make_resolve_request(&removed);
+    let transaction = calculate_deps(pool, &tasks)?;
+
+    Ok(transaction)
+}
+
+pub fn get_task_summary(meta: &[PackageMeta]) -> String {
+    let mut installs = 0usize;
+    let mut updates = 0usize;
+    let mut erases = 0usize;
+    let mut summary = String::new();
+
+    for m in meta {
+        match m.action {
+            PackageAction::Install(_) => installs += 1,
+            PackageAction::Upgrade | PackageAction::Downgrade => updates += 1,
+            PackageAction::Erase => erases += 1,
+            _ => continue,
+        }
+    }
+
+    if installs > 0 {
+        summary += &fl!("install_count", count = installs);
+        summary.push('\n');
+    }
+    if updates > 0 {
+        summary += &fl!("update_count", count = updates);
+        summary.push('\n');
+    }
+    if erases > 0 {
+        summary += &fl!("erase_count", count = erases);
+        summary.push('\n');
+    }
+
+    summary
+}
+
+pub fn get_task_details(meta: &[PackageMeta]) -> String {
+    let mut output = fl!("tx_body");
+    output.push_str("\n\n");
+
+    for m in meta {
+        let name = m.name.clone();
+        let version = m.version.clone();
+        match m.action {
+            PackageAction::Install(_) => {
+                output += &fl!("tx_install", package = name, version = version)
+            }
+            PackageAction::Upgrade => {
+                output += &fl!("tx_upgrade", package = name, version = version)
+            }
+            PackageAction::Downgrade => {
+                output += &fl!("tx_downgrade", package = name, version = version)
+            }
+            PackageAction::Erase => output += &fl!("tx_erase", package = name, version = version),
+            PackageAction::Noop => (),
+        }
+        output.push('\n');
+    }
+
+    output
+}
+
+#[inline]
+fn run_dpkg(args: &[&str]) -> Result<()> {
+    let status = Command::new("dpkg")
+        .args(args)
+        .arg("--no-triggers")
+        .status()?;
+    if !status.success() {
+        let code = status.code().unwrap_or(-1);
+        return Err(anyhow!(fl!("dpkg_error", status = code)));
+    }
+
+    Ok(())
+}
+
+pub fn execute_resolve_response(jobs: &[PackageMeta]) -> Result<()> {
+    for job in jobs {
+        match job.action {
+            PackageAction::Noop => {}
+            PackageAction::Install(_) => run_dpkg(&["--auto-deconfigure", "--unpack", &job.name])?,
+            PackageAction::Erase => run_dpkg(&["--auto-deconfigure", "-r", &job.name])?,
+            // copied from apt
+            PackageAction::Downgrade | PackageAction::Upgrade => run_dpkg(&[
+                "--auto-deconfigure",
+                "--force-remove-protected",
+                "--unpack",
+                &job.name,
+            ])?,
+        }
+    }
+    // force configure all first
+    run_dpkg(&[
+        "--configure",
+        "--pending",
+        "--force-configure-any",
+        "--force-depends",
+    ])
+    .ok();
+    // configure anything that failed during the force configure step
+    run_dpkg(&["--configure", "-a"]).ok();
 
     Ok(())
 }
