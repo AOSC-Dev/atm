@@ -18,4 +18,13 @@ refresh_apt = Refreshing APT databases ...
 revert_apt = Reverting packages to stable ...
 upgrade_prompt = Please upgrade your system:
 
+exe_download = [{$curr}/{$total}] Downloading {$name}...
+exe_verify = [{$curr}/{$total}] Verifying {$name}...
+exe_download_file_error = Download failed: {$name}
+exe_download_error = Unable to download files
+exe_verify_error = Verification failed: {$name}
+exe_path_error = Filename unknown: {$name}
+exe_batch_error = Failed to download packages
+
 apt_finished = APT configuration updated successfully.
+install_error = An error occurred while installing packages: {$error}
