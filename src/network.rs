@@ -19,7 +19,8 @@ use reqwest::{blocking::Client, Url};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::solv::PackageMeta;
+use crate::fl;
+use crate::solv::{PackageAction, PackageMeta};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TopicManifest {
@@ -155,11 +156,11 @@ pub fn batch_download(pkgs: &[PackageMeta], mirror: &str, root: &Path) -> Result
         if batch_download_inner(pkgs, mirror, root).is_ok() {
             return Ok(());
         }
-        eprintln!("[{}/3] Retrying ...", i);
+        eprintln!("[{}/3] Retrying ...", i + 1);
         sleep(Duration::from_secs(2));
     }
 
-    Err(anyhow!("Failed to download packages"))
+    Err(anyhow!(fl!("exe_batch_error")))
 }
 
 fn batch_download_inner(pkgs: &[PackageMeta], mirror: &str, root: &Path) -> Result<()> {
@@ -171,27 +172,38 @@ fn batch_download_inner(pkgs: &[PackageMeta], mirror: &str, root: &Path) -> Resu
         move || client.clone(),
         |client, pkg| {
             let filename = PathBuf::from(pkg.path.clone());
+            let name = pkg.name.as_str();
             count.fetch_add(1, Ordering::SeqCst);
             println!(
-                "[{}/{}] Downloading {}...",
-                count.load(Ordering::SeqCst),
-                total,
-                pkg.name
+                "{}",
+                fl!(
+                    "exe_download",
+                    curr = count.load(Ordering::SeqCst),
+                    total = total,
+                    name = name
+                )
             );
+            match pkg.action {
+                PackageAction::Erase | PackageAction::Noop => return,
+                _ => {}
+            }
             if let Some(filename) = filename.file_name() {
                 let path = root.join(filename);
                 if !path.is_file()
                     && fetch_url(client, &format!("{}/{}", mirror, pkg.path), &path).is_err()
                 {
                     error.store(true, Ordering::SeqCst);
-                    eprintln!("Download failed: {}", pkg.name);
+                    eprintln!("{}", fl!("exe_download_file_error", name = name));
                     return;
                 }
                 println!(
-                    "[{}/{}] Verifying {}...",
-                    count.load(Ordering::SeqCst),
-                    total,
-                    pkg.name
+                    "{}",
+                    fl!(
+                        "exe_verify",
+                        curr = count.load(Ordering::SeqCst),
+                        total = total,
+                        name = name
+                    )
                 );
                 if let Ok(checksum) = sha256sum_file(&path) {
                     if checksum == pkg.sha256 {
@@ -200,17 +212,17 @@ fn batch_download_inner(pkgs: &[PackageMeta], mirror: &str, root: &Path) -> Resu
                 }
                 std::fs::remove_file(path).ok();
                 error.store(true, Ordering::SeqCst);
-                eprintln!("Verification failed: {}", pkg.name);
+                eprintln!("{}", fl!("exe_verify_error", name = name));
                 return;
             } else {
                 error.store(true, Ordering::SeqCst);
-                eprintln!("Filename unknown: {}", pkg.name);
+                eprintln!("{}", fl!("exe_path_error", name = name));
             }
         },
     );
 
     if error.load(Ordering::SeqCst) {
-        return Err(anyhow!("Unable to download files"));
+        return Err(anyhow!(fl!("exe_download_error")));
     }
 
     Ok(())

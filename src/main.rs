@@ -1,6 +1,6 @@
-use std::sync::mpsc;
 use std::time::Duration;
 use std::{cmp::Ordering, collections::HashSet};
+use std::{path::Path, sync::mpsc};
 
 use chrono::prelude::*;
 use cursive::{align::HAlign, traits::*, views::DummyView, views::LinearLayout};
@@ -120,6 +120,22 @@ fn show_tx_details(siv: &mut Cursive, meta: &[PackageMeta]) {
     );
 }
 
+#[inline]
+fn transfer_control_command(s: &mut Cursive, metadata: &Vec<PackageMeta>) {
+    s.add_layer(
+        Dialog::around(TextView::new(fl!("apt_finished")))
+            .title(fl!("message"))
+            .button(fl!("ok"), |s| {
+                s.pop_layer();
+            })
+            .padding_lrtb(2, 2, 1, 1),
+    );
+    // save and quit the current cursive session
+    let dump = s.dump();
+    s.quit();
+    s.set_user_data((metadata.clone(), dump));
+}
+
 fn commit_changes(siv: &mut Cursive) {
     let mut previous: Option<Vec<network::TopicManifest>> = None;
     if let Some(prev) = siv.user_data::<Vec<network::TopicManifest>>() {
@@ -171,7 +187,7 @@ fn commit_changes(siv: &mut Cursive) {
     let metadata = unwrap_or_show_error!(siv, { t.create_metadata() });
     siv.pop_layer();
     if metadata.is_empty() {
-        show_info(siv, &fl!("nothing"));
+        transfer_control_command(siv, &metadata);
         return;
     }
     let human_size = bytesize::ByteSize::kb(size_change.abs() as u64);
@@ -193,18 +209,7 @@ fn commit_changes(siv: &mut Cursive) {
             .button(fl!("details"), move |s| show_tx_details(s, &metadata_clone))
             .button(fl!("proceed"), move |s| {
                 s.pop_layer();
-                s.add_layer(
-                    Dialog::around(TextView::new(fl!("apt_finished")))
-                        .title(fl!("message"))
-                        .button(fl!("ok"), |s| {
-                            s.pop_layer();
-                        })
-                        .padding_lrtb(2, 2, 1, 1),
-                );
-                // save and quit the current cursive session
-                let dump = s.dump();
-                s.quit();
-                s.set_user_data((metadata.clone(), dump));
+                transfer_control_command(s, &metadata);
             })
             .padding_lrtb(2, 2, 1, 1),
     );
@@ -282,6 +287,18 @@ fn main() {
         let dump = siv.take_user_data::<(Vec<PackageMeta>, cursive::Dump)>();
         if let Some((reinstall, dump)) = dump {
             drop(siv);
+            if let Err(e) = network::batch_download(
+                &reinstall,
+                &format!("{}/debs", *pm::MIRROR_URL),
+                Path::new(pm::APT_CACHE_PATH),
+            ) {
+                println!("{}", fl!("install_error", error = format!("{}", e)));
+                break;
+            }
+            if let Err(e) = pm::execute_resolve_response(&reinstall) {
+                println!("{}", fl!("install_error", error = format!("{}", e)));
+                break;
+            }
 
             // create a fresh Cursive instance and load previous state
             siv = cursive::default();

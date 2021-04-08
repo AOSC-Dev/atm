@@ -2,12 +2,11 @@ use std::{
     collections::{HashMap, HashSet},
     fs,
     io::Write,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::Command,
 };
 
 use crate::fl;
-use crate::i18n::I18N_LOADER;
 use crate::solv::Task;
 use crate::{network::make_new_client, parser::list_installed};
 use crate::{
@@ -17,7 +16,7 @@ use crate::{
 use anyhow::{anyhow, Result};
 use lazy_static::lazy_static;
 use libc::c_int;
-use libsolv_sys::ffi::{SOLVER_DISTUPGRADE, SOLVER_SOLVABLE_ALL, SOLVER_UPDATE};
+use libsolv_sys::ffi::{SOLVER_DISTUPGRADE, SOLVER_SOLVABLE_ALL};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_slice, to_string};
 
@@ -26,7 +25,7 @@ const SOURCE_PATH: &str = "/etc/apt/sources.list.d/atm.list";
 const STATE_PATH: &str = "/var/lib/atm/state";
 const STATE_DIR: &str = "/var/lib/atm/";
 const DPKG_STATE: &str = "/var/lib/dpkg/status";
-const APT_CACHE_PATH: &str = "/var/cache/apt/archives";
+pub const APT_CACHE_PATH: &str = "/var/cache/apt/archives";
 const APT_GEN_LIST_STATUS: &str = "/var/lib/apt/gen/status.json";
 const MIRRORS_DATA: &str = "/usr/share/distro-repository-data/mirrors.yml";
 const DEFAULT_REPO_URL: &str = "https://repo.aosc.io";
@@ -287,18 +286,33 @@ fn run_dpkg(args: &[&str]) -> Result<()> {
     Ok(())
 }
 
+fn get_archive_path(package: &str) -> Result<String> {
+    let filename = Path::new(package)
+        .file_name()
+        .ok_or_else(|| anyhow!(fl!("package_path_error")))?;
+
+    Ok(Path::new(APT_CACHE_PATH)
+        .join(filename)
+        .to_string_lossy()
+        .to_string())
+}
+
 pub fn execute_resolve_response(jobs: &[PackageMeta]) -> Result<()> {
     for job in jobs {
         match job.action {
             PackageAction::Noop => {}
-            PackageAction::Install(_) => run_dpkg(&["--auto-deconfigure", "--unpack", &job.name])?,
+            PackageAction::Install(_) => run_dpkg(&[
+                "--auto-deconfigure",
+                "--unpack",
+                &get_archive_path(&job.name)?,
+            ])?,
             PackageAction::Erase => run_dpkg(&["--auto-deconfigure", "-r", &job.name])?,
             // copied from apt
             PackageAction::Downgrade | PackageAction::Upgrade => run_dpkg(&[
                 "--auto-deconfigure",
                 "--force-remove-protected",
                 "--unpack",
-                &job.name,
+                &get_archive_path(&job.name)?,
             ])?,
         }
     }

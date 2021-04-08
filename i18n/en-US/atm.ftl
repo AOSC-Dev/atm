@@ -29,6 +29,7 @@ update_count = {$count ->
     [one] one package will be upgraded or downgraded
     *[other] {$count} packages will be upgraded or downgraded
 }
+package_path_error = Package path could not be parsed.
 disk_space_decrease = After this operation, {$size} of additional disk space will be used.
 disk_space_increase = After this operation, {$size} of additional disk space will be freed.
 details = Details
@@ -39,4 +40,13 @@ tx_upgrade = Upgrade: {$package} (To {$version})
 tx_downgrade = Downgrade: {$package} (To {$version})
 tx_erase = Erase: {$package} ({$version})
 
+exe_download = [{$curr}/{$total}] Downloading {$name}...
+exe_verify = [{$curr}/{$total}] Verifying {$name}...
+exe_download_file_error = Download failed: {$name}
+exe_download_error = Unable to download files
+exe_verify_error = Verification failed: {$name}
+exe_path_error = Filename unknown: {$name}
+exe_batch_error = Failed to download packages
+
 apt_finished = APT configuration updated successfully.
+install_error = An error occurred while installing packages: {$error}
