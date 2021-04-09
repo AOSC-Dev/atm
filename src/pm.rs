@@ -16,7 +16,7 @@ use crate::{
 use anyhow::{anyhow, Result};
 use lazy_static::lazy_static;
 use libc::c_int;
-use libsolv_sys::ffi::{SOLVER_DISTUPGRADE, SOLVER_SOLVABLE_ALL};
+use libsolv_sys::ffi::{SOLVER_DISTUPGRADE, SOLVER_SOLVABLE_ALL, SOLVER_UPDATE};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_slice, to_string};
 
@@ -187,7 +187,7 @@ pub fn make_resolve_request(remove: &[String]) -> Vec<Task> {
         .collect::<Vec<Task>>();
     requests.push(Task {
         name: None,
-        flags: (SOLVER_DISTUPGRADE | SOLVER_SOLVABLE_ALL) as c_int,
+        flags: (SOLVER_UPDATE | SOLVER_SOLVABLE_ALL) as c_int,
     });
 
     requests
@@ -275,8 +275,8 @@ pub fn get_task_details(meta: &[PackageMeta]) -> String {
 #[inline]
 fn run_dpkg(args: &[&str]) -> Result<()> {
     let status = Command::new("dpkg")
-        .args(args)
         .arg("--no-triggers")
+        .args(args)
         .status()?;
     if !status.success() {
         let code = status.code().unwrap_or(-1);
@@ -304,7 +304,7 @@ pub fn execute_resolve_response(jobs: &[PackageMeta]) -> Result<()> {
             PackageAction::Install(_) => run_dpkg(&[
                 "--auto-deconfigure",
                 "--unpack",
-                &get_archive_path(&job.name)?,
+                &get_archive_path(&job.path)?,
             ])?,
             PackageAction::Erase => run_dpkg(&["--auto-deconfigure", "-r", &job.name])?,
             // copied from apt
@@ -312,7 +312,7 @@ pub fn execute_resolve_response(jobs: &[PackageMeta]) -> Result<()> {
                 "--auto-deconfigure",
                 "--force-remove-protected",
                 "--unpack",
-                &get_archive_path(&job.name)?,
+                &get_archive_path(&job.path)?,
             ])?,
         }
     }
