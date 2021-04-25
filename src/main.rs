@@ -145,7 +145,11 @@ fn fetch_manifest(siv: &mut CursiveRunner<&mut Cursive>) {
         network::fetch_topics(&format!(
             "{}{}",
             pm::MIRROR_URL.to_string(),
-            "debs/manifest/topics.json"
+            if pm::MIRROR_URL.to_string().ends_with("/") {
+                "debs/manifest/topics.json"
+            } else {
+                "/debs/manifest/topics.json"
+            }
         ))
     });
     let filtered = unwrap_or_show_error!(siv, {

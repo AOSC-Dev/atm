@@ -51,7 +51,7 @@ pub fn get_mirror_url() -> Result<String> {
 
 lazy_static! {
     pub static ref MIRROR_URL: String =
-        get_mirror_url().unwrap_or_else(|_| "https://repo.aosc.io/".to_string());
+        get_mirror_url().unwrap_or_else(|_| DEFAULT_REPO_URL.to_string());
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -147,7 +147,15 @@ fn make_topic_list(topics: &[&TopicManifest]) -> String {
         output.push_str(&format!(
             "# Topic `{}`\ndeb {} {} main\n",
             topic.name,
-            format!("{}{}", MIRROR_URL.to_string(), "debs"),
+            format!(
+                "{}{}",
+                MIRROR_URL.to_string(),
+                if MIRROR_URL.to_string().ends_with("/") {
+                    "debs"
+                } else {
+                    "/debs"
+                }
+            ),
             topic.name
         ));
     }
