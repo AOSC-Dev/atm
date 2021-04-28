@@ -300,10 +300,28 @@ impl Solver {
     pub fn solve(&self, queue: &mut Queue) -> Result<()> {
         let result = unsafe { ffi::solver_solve(self.solver, &mut queue.queue) };
         if result != 0 {
-            return Err(anyhow!("Solve failed: {}", result));
+            let problem = self.get_problems();
+            match problem {
+                Ok(problems) => return Err(anyhow!("Issues found: \n{}", problems.join("\n"))),
+                Err(_) => return Err(anyhow!("Solve failed: {}", result)),
+            }
         }
 
         Ok(())
+    }
+
+    fn get_problems(&self) -> Result<Vec<String>> {
+        let mut problems = Vec::new();
+        let count = unsafe { ffi::solver_problem_count(self.solver) };
+        for i in 1..=count {
+            let problem = unsafe { ffi::solver_problem2str(self.solver, i as c_int) };
+            if problem.is_null() {
+                return Err(anyhow!("problem2str failed: {}", i));
+            }
+            problems.push(unsafe { CStr::from_ptr(problem).to_string_lossy().to_string() });
+        }
+
+        Ok(problems)
     }
 }
 
