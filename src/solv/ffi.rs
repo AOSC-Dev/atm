@@ -3,11 +3,8 @@ use anyhow::{anyhow, Result};
 use hex::encode;
 use libc::{c_char, c_int};
 use libsolv_sys::ffi;
-use std::{convert::TryInto, ffi::CStr, os::unix::ffi::OsStrExt, slice};
+use std::{ffi::CStr, os::unix::ffi::OsStrExt, slice};
 use std::{ffi::CString, path::Path, ptr::null_mut};
-
-pub const SELECTION_NAME: c_int = 1 << 0;
-pub const SELECTION_FLAT: c_int = 1 << 10;
 
 pub const SOLVER_FLAG_BEST_OBEY_POLICY: c_int = 12;
 
@@ -80,8 +77,8 @@ fn solvable_to_meta(
     };
 
     Ok(PackageMeta {
-        name: name,
-        version: version,
+        name,
+        version,
         sha256: encode(checksum),
         path: path + "/" + &filename,
         action: change_to_action(change_type)?,
@@ -95,26 +92,21 @@ impl Pool {
         }
     }
 
-    pub fn match_package(&self, name: &str, mut queue: Queue) -> Result<Queue> {
+    pub fn str2id(&self, name: &str) -> Result<c_int> {
         if unsafe { (*self.pool).whatprovides.is_null() } {
             // we can't call createwhatprovides here because of how libsolv manages internal states
             return Err(anyhow!(
-                "internal error: `createwhatprovides` needs to be called first."
+                "Internal error: `createwhatprovides` needs to be called first."
             ));
         }
         let ret = unsafe {
-            ffi::selection_make(
-                self.pool,
-                &mut queue.queue,
-                cstr!(name),
-                SELECTION_NAME | SELECTION_FLAT,
-            )
+            ffi::pool_str2id(self.pool, cstr!(name), 0)
         };
-        if ret < 1 {
-            return Err(anyhow!("Error matching the package: {}", name));
+        if ret == 0 {
+            return Err(anyhow!("Internal error: name `{}` does not map to a solvable ID.", name));
         }
 
-        Ok(queue)
+        Ok(ret)
     }
 
     pub fn createwhatprovides(&mut self) {
@@ -186,15 +178,6 @@ impl Queue {
         }
     }
 
-    pub fn mark_all_as(&mut self, flags: c_int) {
-        for item in (0..self.queue.count).step_by(2) {
-            unsafe {
-                let addr = self.queue.elements.offset(item.try_into().unwrap());
-                (*addr) |= flags;
-            }
-        }
-    }
-
     pub fn push2(&mut self, a: c_int, b: c_int) {
         self.push(a);
         self.push(b);
@@ -210,17 +193,6 @@ impl Queue {
             (*elem) = item;
         }
         self.queue.left -= 1;
-    }
-
-    pub fn extend(&mut self, q: &Queue) {
-        unsafe {
-            ffi::queue_insertn(
-                &mut self.queue,
-                self.queue.count,
-                q.queue.count,
-                q.queue.elements,
-            )
-        }
     }
 }
 
