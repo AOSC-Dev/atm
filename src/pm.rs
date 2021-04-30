@@ -16,7 +16,7 @@ use crate::{
 use anyhow::{anyhow, Result};
 use lazy_static::lazy_static;
 use libc::c_int;
-use libsolv_sys::ffi::{SOLVER_DISTUPGRADE, SOLVER_SOLVABLE_ALL, SOLVER_UPDATE};
+use libsolv_sys::ffi::{SOLVER_DISTUPGRADE, SOLVER_SOLVABLE_ALL, SOLVER_FORCEBEST};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_slice, to_string};
 
@@ -182,12 +182,12 @@ pub fn make_resolve_request(remove: &[String]) -> Vec<Task> {
         .iter()
         .map(|x| Task {
             name: Some(x.clone()),
-            flags: SOLVER_DISTUPGRADE as c_int,
+            flags: (SOLVER_DISTUPGRADE | SOLVER_FORCEBEST) as c_int,
         })
         .collect::<Vec<Task>>();
     requests.push(Task {
         name: None,
-        flags: (SOLVER_UPDATE | SOLVER_SOLVABLE_ALL) as c_int,
+        flags: (SOLVER_DISTUPGRADE | SOLVER_FORCEBEST | SOLVER_SOLVABLE_ALL) as c_int,
     });
 
     requests
