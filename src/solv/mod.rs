@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 pub use ffi::{Pool, Queue, Repo, Solver, Transaction, SOLVER_FLAG_BEST_OBEY_POLICY};
 use libc::c_int;
-use libsolv_sys::ffi::SOLVER_FLAG_ALLOW_UNINSTALL;
+use libsolv_sys::ffi::{SOLVER_FLAG_ALLOW_UNINSTALL, SOLVER_FLAG_FOCUS_BEST};
 
 #[derive(Clone, Debug)]
 pub enum PackageAction {
@@ -47,6 +47,7 @@ pub fn calculate_deps(pool: &mut Pool, tasks: &[Task]) -> Result<Transaction> {
     let mut solver = Solver::new(pool);
     solver.set_flag(SOLVER_FLAG_ALLOW_UNINSTALL as c_int, 1)?;
     solver.set_flag(SOLVER_FLAG_BEST_OBEY_POLICY, 1)?;
+    solver.set_flag(SOLVER_FLAG_FOCUS_BEST as c_int, 1)?;
     solver.solve(&mut q)?;
     let trans = solver.create_transaction()?;
     trans.order(0);

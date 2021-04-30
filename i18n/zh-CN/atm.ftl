@@ -26,8 +26,8 @@ details = 详情
 tx_title = 操作详情
 tx_body = 将进行如下操作：
 tx_install = 安装：{$package} ({$version})
-tx_upgrade = 升级：{$package} (To {$version})
-tx_downgrade = 降级：{$package} (To {$version})
+tx_upgrade = 升级：{$package} (至 {$version})
+tx_downgrade = 降级：{$package} (至 {$version})
 tx_erase = 卸载：{$package} ({$version})
 
 exe_download = [{$curr}/{$total}] 正在下载 {$name} ……
@@ -39,3 +39,4 @@ exe_path_error = 未知文件名：{$name}
 exe_batch_error = 无法下载软件包
 
 apt_finished = APT 配置信息更新成功。
+install_error = 安装软件包时发生错误：{$error}

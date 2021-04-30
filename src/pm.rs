@@ -264,7 +264,7 @@ pub fn get_task_details(meta: &[PackageMeta]) -> String {
                 output += &fl!("tx_downgrade", package = name, version = version)
             }
             PackageAction::Erase => output += &fl!("tx_erase", package = name, version = version),
-            PackageAction::Noop => (),
+            PackageAction::Noop => continue,
         }
         output.push('\n');
     }
