@@ -33,10 +33,13 @@ pub struct Task {
 
 /// Simulate the apt dependency resolution
 pub fn calculate_deps(pool: &mut Pool, tasks: &[Task]) -> Result<Transaction> {
+    let mut tmp = Queue::new();
     let mut q = Queue::new();
     for task in tasks {
         if let Some(name) = &task.name {
-            q.push2(0x2 | task.flags, pool.str2id(name)?);
+            tmp = pool.match_package(&name, tmp)?;
+            q.extend(&tmp);
+            q.mark_all_as(task.flags);
             continue;
         }
         q.push2(task.flags, 0);
