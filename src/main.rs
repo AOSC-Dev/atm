@@ -16,6 +16,13 @@ mod solv;
 use i18n::I18N_LOADER;
 use solv::{PackageMeta, Pool};
 
+macro_rules! press_enter_to_continue {
+    ($message_id:literal) => {
+        println!("{}", fl!($message_id));
+        std::io::stdin().read_line(&mut String::new()).unwrap();
+    }
+}
+
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 enum TopicColumn {
     Enabled,
@@ -90,17 +97,6 @@ fn show_error(siv: &mut Cursive, msg: &str) {
         Dialog::around(TextView::new(msg))
             .title(fl!("error"))
             .button(fl!("exit"), |s| s.quit())
-            .padding_lrtb(2, 2, 1, 1),
-    );
-}
-
-fn show_info(siv: &mut Cursive, msg: &str) {
-    siv.add_layer(
-        Dialog::around(TextView::new(msg))
-            .title(fl!("message"))
-            .button(fl!("ok"), |s| {
-                s.pop_layer();
-            })
             .padding_lrtb(2, 2, 1, 1),
     );
 }
@@ -293,13 +289,16 @@ fn main() {
                 Path::new(pm::APT_CACHE_PATH),
             ) {
                 println!("{}", fl!("install_error", error = format!("{}", e)));
+                press_enter_to_continue!("press_enter_to_bail");
                 break;
             }
             if let Err(e) = pm::execute_resolve_response(&reinstall) {
                 println!("{}", fl!("install_error", error = format!("{}", e)));
+                press_enter_to_continue!("press_enter_to_bail");
                 break;
             }
 
+            press_enter_to_continue!("press_enter_to_return");
             // create a fresh Cursive instance and load previous state
             siv = cursive::default();
             siv.restore(dump);

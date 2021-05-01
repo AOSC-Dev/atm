@@ -40,3 +40,6 @@ exe_batch_error = 无法下载软件包
 
 apt_finished = APT 配置信息更新成功。
 install_error = 安装软件包时发生错误：{$error}
+
+press_enter_to_return = 请按 Enter 键返回主菜单。
+press_enter_to_bail = 请按 Enter 键退出程序。

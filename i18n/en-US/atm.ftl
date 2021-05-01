@@ -50,3 +50,6 @@ exe_batch_error = Failed to download packages
 
 apt_finished = APT configuration updated successfully.
 install_error = An error occurred while installing packages: {$error}
+
+press_enter_to_return = Press Enter to return to the main menu.
+press_enter_to_bail = Press Enter to return to quit.
