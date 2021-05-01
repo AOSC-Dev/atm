@@ -325,7 +325,7 @@ pub fn execute_resolve_response(jobs: &[PackageMeta]) -> Result<()> {
     ])
     .ok();
     // configure anything that failed during the force configure step
-    run_dpkg(&["--configure", "-a"]).ok();
+    run_dpkg(&["--configure", "-a"])?;
 
     Ok(())
 }
