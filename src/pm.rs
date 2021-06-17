@@ -14,6 +14,7 @@ use crate::{
     solv::{calculate_deps, populate_pool, PackageAction, PackageMeta, Pool, Transaction},
 };
 use anyhow::{anyhow, Result};
+use indexmap::IndexMap;
 use lazy_static::lazy_static;
 use libc::c_int;
 use libsolv_sys::ffi::{SOLVER_DISTUPGRADE, SOLVER_FORCEBEST, SOLVER_SOLVABLE_ALL, SOLVER_UPDATE};
@@ -27,12 +28,11 @@ const STATE_DIR: &str = "/var/lib/atm/";
 const DPKG_STATE: &str = "/var/lib/dpkg/status";
 pub const APT_CACHE_PATH: &str = "/var/cache/apt/archives";
 const APT_GEN_LIST_STATUS: &str = "/var/lib/apt/gen/status.json";
-const MIRRORS_DATA: &str = "/usr/share/distro-repository-data/mirrors.yml";
 const DEFAULT_REPO_URL: &str = "https://repo.aosc.io";
 
 #[derive(Deserialize, Debug)]
 struct AptGenListStatus {
-    mirror: Vec<String>,
+    mirror: IndexMap<String, String>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -43,17 +43,13 @@ struct Mirror {
 pub fn get_mirror_url() -> Result<String> {
     let status_data = fs::read(APT_GEN_LIST_STATUS)?;
     let status_data: AptGenListStatus = serde_json::from_slice(&status_data)?;
-    let mirror;
-    if let Some(m) = status_data.mirror.get(0) {
-        mirror = m.to_string();
-    } else {
-        mirror = "origin".to_string();
-    }
-
-    let mirrors_data = fs::read(MIRRORS_DATA)?;
-    let mirror_data: HashMap<String, Mirror> = serde_yaml::from_slice(&mirrors_data)?;
-    if let Some(mirror) = mirror_data.get(&mirror) {
-        return Ok(mirror.url.to_string());
+    if let Some((_, url)) = status_data.mirror.first() {
+        let url = if url.ends_with('/') {
+            url.clone()
+        } else {
+            format!("{}/", url)
+        };
+        return Ok(url);
     }
 
     Ok(DEFAULT_REPO_URL.to_string())
