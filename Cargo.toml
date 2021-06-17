@@ -20,6 +20,7 @@ nom = "6.1"
 cursive = { version = "0.16", features = ["crossterm-backend"], default-features = false }
 cursive_table_view = { git = "https://github.com/BonsaiDen/cursive_table_view" }
 cursive-async-view = "0.5"
+indexmap = { version ="1.6", features = ["serde-1"] }
 # packagekit related
 dbus = "0.9"
 # i18n
