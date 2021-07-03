@@ -14,13 +14,6 @@ mod pm;
 
 use i18n::I18N_LOADER;
 
-macro_rules! press_enter_to_continue {
-    ($message_id:literal) => {
-        println!("{}", fl!($message_id));
-        std::io::stdin().read_line(&mut String::new()).unwrap();
-    }
-}
-
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 enum TopicColumn {
     Enabled,
