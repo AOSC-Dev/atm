@@ -30,7 +30,11 @@ struct Localizations;
 fn load_i18n() -> Result<FluentLanguageLoader> {
     let language_loader: FluentLanguageLoader = fluent_language_loader!();
     let requested_languages = DesktopLanguageRequester::requested_languages();
-    let languages: Vec<&LanguageIdentifier> = requested_languages.iter().collect();
+    let fallback_language: &[LanguageIdentifier] = &["en-US".parse().unwrap()];
+    let languages: Vec<&LanguageIdentifier> = requested_languages
+        .iter()
+        .chain(fallback_language.iter())
+        .collect();
     language_loader.load_languages(&Localizations, &languages)?;
 
     Ok(language_loader)
