@@ -5,23 +5,17 @@ use std::{path::Path, sync::mpsc};
 use chrono::prelude::*;
 use cursive::{align::HAlign, traits::*, views::DummyView, views::LinearLayout};
 use cursive::{views::Dialog, views::TextView, Cursive, CursiveRunner};
+use cursive_async_view::AsyncView;
 use cursive_table_view::{TableView, TableViewItem};
 
 mod i18n;
 mod network;
 mod parser;
+mod pk;
 mod pm;
-mod solv;
 
 use i18n::I18N_LOADER;
-use solv::{PackageMeta, Pool};
-
-macro_rules! press_enter_to_continue {
-    ($message_id:literal) => {
-        println!("{}", fl!($message_id));
-        std::io::stdin().read_line(&mut String::new()).unwrap();
-    }
-}
+use pk::PkPackage;
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 enum TopicColumn {
@@ -101,10 +95,10 @@ fn show_error(siv: &mut Cursive, msg: &str) {
     );
 }
 
-fn show_tx_details(siv: &mut Cursive, meta: &[PackageMeta]) {
+fn show_tx_details(siv: &mut Cursive, meta: &[PkPackage]) {
     siv.add_layer(
         Dialog::around(
-            TextView::new(pm::get_task_details(meta))
+            TextView::new(unwrap_or_show_error!(siv, { pk::get_task_details(meta) }))
                 .scrollable()
                 .scroll_y(true),
         )
@@ -114,22 +108,6 @@ fn show_tx_details(siv: &mut Cursive, meta: &[PackageMeta]) {
         })
         .padding_lrtb(2, 2, 1, 1),
     );
-}
-
-#[inline]
-fn transfer_control_command(s: &mut Cursive, metadata: &Vec<PackageMeta>) {
-    s.add_layer(
-        Dialog::around(TextView::new(fl!("apt_finished")))
-            .title(fl!("message"))
-            .button(fl!("ok"), |s| {
-                s.pop_layer();
-            })
-            .padding_lrtb(2, 2, 1, 1),
-    );
-    // save and quit the current cursive session
-    let dump = s.dump();
-    s.quit();
-    s.set_user_data((metadata.clone(), dump));
 }
 
 fn commit_changes(siv: &mut Cursive) {
@@ -165,51 +143,40 @@ fn commit_changes(siv: &mut Cursive) {
     );
     let (result, items) = unwrap_or_show_error!(siv, { rx.recv_timeout(Duration::from_secs(10)) });
     unwrap_or_show_error!(siv, { result });
-    show_blocking_message(siv, &fl!("refresh_apt"));
-    let mut enabled: Vec<network::TopicManifest> =
-        items.clone().into_iter().filter(|x| x.enabled).collect();
-    enabled.push(network::TopicManifest {
-        enabled: true,
-        closed: true,
-        name: "stable".to_string(),
-        description: None,
-        date: 0,
-        arch: HashSet::new(),
-        packages: Vec::new(),
-    });
-    let mut pool = Pool::new();
-    let t = unwrap_or_show_error!(siv, { pm::switch_topics(&mut pool, &enabled, &reinstall) });
-    let size_change = t.get_size_change();
-    let metadata = unwrap_or_show_error!(siv, { t.create_metadata() });
-    siv.pop_layer();
-    if metadata.is_empty() {
-        transfer_control_command(siv, &metadata);
-        return;
-    }
-    let human_size = bytesize::ByteSize::kb(size_change.abs() as u64);
-    let mut summary = pm::get_task_summary(&metadata);
-    summary.push('\n');
-    if size_change > 0 {
-        summary += &fl!("disk_space_decrease", size = human_size.to_string());
-    } else {
-        summary += &fl!("disk_space_increase", size = human_size.to_string());
-    }
-    let metadata_clone = metadata.clone();
-
-    siv.add_layer(
-        Dialog::around(TextView::new(summary))
-            .title(fl!("message"))
-            .button(fl!("exit"), |s| {
-                s.pop_layer();
-            })
-            .button(fl!("details"), move |s| show_tx_details(s, &metadata_clone))
-            .button(fl!("proceed"), move |s| {
-                s.pop_layer();
-                transfer_control_command(s, &metadata);
-            })
-            .padding_lrtb(2, 2, 1, 1),
-    );
     siv.set_user_data(items);
+    let loader = AsyncView::new_with_bg_creator(
+        siv,
+        move || {
+            let conn = pk::create_dbus_connection()
+                .map_err(|e| fl!("pk_dbus_error", error = e.to_string()))?;
+            let proxy = pk::connect_packagekit(&conn)
+                .map_err(|e| fl!("pk_comm_error", error = e.to_string()))?;
+            let (not_found, tasks) =
+                pm::switch_topics(&proxy, &reinstall).map_err(|e| e.to_string())?;
+            let proxy = pk::create_transaction(&proxy)
+                .map_err(|e| fl!("pk_comm_error", error = e.to_string()))?;
+            let tasks = tasks.iter().map(|t| t.as_str()).collect::<Vec<_>>();
+            let transaction =
+                pk::get_transaction_steps(&proxy, &tasks).map_err(|e| e.to_string())?;
+
+            Ok(transaction)
+        },
+        |t| {
+            let summary = pk::get_task_summary(&t);
+            Dialog::around(TextView::new(summary))
+                .title(fl!("message"))
+                .button(fl!("exit"), |s| {
+                    s.pop_layer();
+                })
+                .button(fl!("details"), move |s| show_tx_details(s, &t))
+                .button(fl!("proceed"), move |s| {
+                    s.pop_layer();
+                    todo!()
+                })
+                .padding_lrtb(2, 2, 1, 1)
+        },
+    );
+    siv.add_layer(loader);
 }
 
 fn fetch_manifest(siv: &mut CursiveRunner<&mut Cursive>) {
@@ -265,6 +232,7 @@ fn fetch_manifest(siv: &mut CursiveRunner<&mut Cursive>) {
         top_view.add_child(TextView::new(fl!("topic_selection_closed_topic_warning")));
     }
     top_view.add_child(view.scroll_x(true));
+    siv.pop_layer();
     siv.add_layer(
         Dialog::around(top_view)
             .title(fl!("topic_selection"))
@@ -278,33 +246,4 @@ fn main() {
     let mut siv = cursive::default();
     fetch_manifest(&mut siv.runner());
     siv.run();
-
-    loop {
-        let dump = siv.take_user_data::<(Vec<PackageMeta>, cursive::Dump)>();
-        if let Some((reinstall, dump)) = dump {
-            drop(siv);
-            if let Err(e) = network::batch_download(
-                &reinstall,
-                &format!("{}/debs", *pm::MIRROR_URL),
-                Path::new(pm::APT_CACHE_PATH),
-            ) {
-                println!("{}", fl!("install_error", error = format!("{}", e)));
-                press_enter_to_continue!("press_enter_to_bail");
-                break;
-            }
-            if let Err(e) = pm::execute_resolve_response(&reinstall) {
-                println!("{}", fl!("install_error", error = format!("{}", e)));
-                press_enter_to_continue!("press_enter_to_bail");
-                break;
-            }
-
-            press_enter_to_continue!("press_enter_to_return");
-            // create a fresh Cursive instance and load previous state
-            siv = cursive::default();
-            siv.restore(dump);
-            siv.run();
-        } else {
-            break;
-        }
-    }
 }

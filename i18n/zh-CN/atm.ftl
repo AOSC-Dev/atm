@@ -30,6 +30,12 @@ tx_upgrade = 升级：{$package} (至 {$version})
 tx_downgrade = 降级：{$package} (至 {$version})
 tx_erase = 卸载：{$package} ({$version})
 
+pk_dbus_error = Failed to connect to D-Bus system bus: {$error}
+pk_comm_error = Unable to communicate with the PackageKit daemon: {$error}
+pk_tx_error = PackageKit daemon reported an error: {$error}
+pk_comm_no_response = PackageKit daemon did not return a response.
+pk_invalid_id = Package identifier "{$name}" is invalid. This is a bug, please report this issue to https://github.com/AOSC-Dev/atm/issues/new.
+
 exe_download = [{$curr}/{$total}] 正在下载 {$name} ……
 exe_verify = [{$curr}/{$total}] 正在校验 {$name} ……
 exe_download_file_error = 无法下载：{$name}
