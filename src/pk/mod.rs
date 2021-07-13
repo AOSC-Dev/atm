@@ -10,7 +10,6 @@ use std::{
         mpsc::{channel, Sender},
         Arc,
     },
-    thread::{self, JoinHandle},
     time::Duration,
 };
 
@@ -432,6 +431,9 @@ pub fn is_using_battery() -> Result<bool> {
     Ok(result)
 }
 
-pub fn is_metered_network(proxy: &Proxy<&Connection>) -> Result<bool> {
+pub fn is_metered_network() -> Result<bool> {
+    let conn = Connection::new_system()?;
+    let proxy = connect_packagekit(&conn)?;
+
     Ok(proxy.network_state()? == PK_NETWORK_ENUM_MOBILE as u32)
 }

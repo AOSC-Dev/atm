@@ -1,5 +1,6 @@
 message = 信息
 exit = 退出
+cancel = 取消
 proceed = 继续
 error = 错误
 ok = 确定

@@ -1,5 +1,6 @@
 message = Message
 exit = Exit
+cancel = Cancel
 proceed = Proceed
 error = Error
 ok = OK

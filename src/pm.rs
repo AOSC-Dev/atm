@@ -4,11 +4,10 @@ use std::{
     io::Write,
 };
 
-use crate::network::{get_arch_name, TopicManifest, TopicManifests};
+use crate::network::{TopicManifest, TopicManifests};
 use crate::parser::list_installed;
-use crate::pk::{find_stable_version_of, get_updated_packages, refresh_cache};
-use crate::{fl, pk::create_transaction};
-use anyhow::{anyhow, Result};
+use crate::pk::{create_transaction, find_stable_version_of, get_updated_packages, refresh_cache};
+use anyhow::Result;
 use dbus::blocking::{Connection, Proxy};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};

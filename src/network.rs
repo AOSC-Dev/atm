@@ -1,4 +1,4 @@
-use std::{collections::HashSet, env::consts::ARCH, fs::File, path::Path};
+use std::{collections::HashSet, env::consts::ARCH};
 
 use anyhow::{anyhow, Result};
 use reqwest::blocking::Client;
