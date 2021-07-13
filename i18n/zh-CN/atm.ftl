@@ -16,7 +16,7 @@ refresh_manifest = 正在下载分支信息……
 refresh_apt = 正在下载软件包信息……
 nothing = 无待办事项。
 dpkg_error = dpkg 返回错误码：{$status}
-no_stable_version = Notice: {$count} packages could not be downgraded to their stable versions.
+no_stable_version = 提示：无法降级 {$count} 个软件包到稳定版本。
 install_count = 将安装 {$count} 个软件包
 erase_count = 将卸载 {$count} 个软件包
 update_count = 将升级或降级 {$count} 个软件包
@@ -26,35 +26,41 @@ disk_space_increase = 该操作将释放 {$size} 存储空间。
 details = 详情
 tx_title = 操作详情
 tx_body = 将进行如下操作：
-tx_hold = Kept Back: {$package} (No stable version)
-tx_install = 安装：{$package} ({$version})
-tx_upgrade = 升级：{$package} (至 {$version})
-tx_downgrade = 降级：{$package} (至 {$version})
-tx_erase = 卸载：{$package} ({$version})
+tx_hold = 保持不变：{$package}（无稳定版本）
+tx_install = 安装：{$package}（{$version}）
+tx_upgrade = 升级：{$package}（至 {$version}）
+tx_downgrade = 降级：{$package}（至 {$version}）
+tx_erase = 卸载：{$package}（{$version}）
 
-pk_metered_network = You seem to be on a metered or celluar network.
-    ATM will consume a large amount of network data during the transaction.
-    Do you still wish to continue?
-pk_battery = You seem to be on battery power.
-    ATM will deplete the battery rather quickly during the transaction.
-    It is recommended to plug in the power supply to prevent sudden power failure.
-    Do you still wish to continue?
+pk_metered_network = 您似乎正在使用计费网络或移动数据流量。
+
+    ATM 在执行任务时可能会从网络下载大量数据。您确定要继续吗？
+pk_battery = 您的电脑目前似乎正在使用电池供电。
+
+    ATM 在执行任务时可能会消耗大量电量，推荐您接入交流电源以防断电导致数据损坏。
+    您确定要继续吗？
 pk_inhibit_message = ATM 正在点钞
-pk_dbus_error = Failed to connect to D-Bus system bus: {$error}
-pk_comm_error_mid_tx = PackageKit daemon unexpectedly disconnected or crashed mid-transaction.
-    Your system is likely in an inconsistent state and requires repairing.
-    Please quit ATM and run `apt install -f` in your terminal to fix the problem.
+pk_dbus_error = 无法连接到系统 D-Bus 总线：{$error}
+pk_comm_error_mid_tx = PackageKit 守护程序连接丢失或在执行任务时突然崩溃。
 
-    Error message: {$error}
-pk_comm_error = Unable to communicate with the PackageKit daemon: {$error}
-pk_tx_error = PackageKit daemon reported an error: {$error}
-pk_comm_no_response = PackageKit daemon did not return a response.
-pk_invalid_id = Package identifier "{$name}" is invalid. This is a bug, please report this issue to https://github.com/AOSC-Dev/atm/issues/new.
+    您的系统目前可能处于不稳定状态并需要您手动修复。请退出 ATM 并在终端中运行
 
-exe-title = Transaction In-Progress
-exe-overall = Overall Progress:
+    `apt install -f`
+
+    以尝试解决问题。
+
+    错误信息：{$error}
+pk_comm_error = 无法与 PackageKit 守护程序通信：{$error}
+pk_tx_error = PackageKit 守护程序报错：{$error}
+pk_comm_no_response = PackageKit 守护程序无响应。
+pk_invalid_id = 包名 "{$name}" 无效。
+
+    程序发生了未预期错误，请于 https://github.com/AOSC-Dev/atm/issues/new 报告该问题。
+
+exe-title = 正在执行任务
+exe-overall = 总进度：
 exe_download = 正在下载 {$name} ……
-exe-install = Installing {$name}...
+exe-install = 正在安装 {$name} ……
 exe_download_file_error = 无法下载：{$name}
 exe_download_error = 无法下载文件
 #exe_verify_error = 校验出错：{$name}
