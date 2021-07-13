@@ -17,6 +17,10 @@ refresh_manifest = Fetching manifest...
 refresh_apt = Downloading packages information...
 nothing = Nothing to do.
 dpkg_error = dpkg returned error: {$status}
+no_stable_version = {$count ->
+    [one] Notice: there is one package that does not have a stable version to downgrade to.
+    *[other] Notice: {$count} packages could not be downgraded to their stable versions.
+}
 install_count = {$count ->
     [one] one package will be installed
     *[other] {$count} packages will be installed
@@ -35,19 +39,36 @@ package_path_error = Package path could not be parsed.
 details = Details
 tx_title = Transaction Details
 tx_body = The following operations will be performed:
+tx_hold = Kept Back: {$package} (No stable version)
 tx_install = Install: {$package} ({$version})
 tx_upgrade = Upgrade: {$package} (To {$version})
 tx_downgrade = Downgrade: {$package} (To {$version})
 tx_erase = Erase: {$package} ({$version})
 
+pk_metered_network = You seem to be on a metered or celluar network.
+    ATM will consume a large amount of network data during the transaction.
+    Do you still wish to continue?
+pk_battery = You seem to be on battery power.
+    ATM will deplete the battery rather quickly during the transaction.
+    It is recommended to plug in the power supply to prevent sudden power failure.
+    Do you still wish to continue?
+pk_inhibit_message = ATM transaction is in progress
 pk_dbus_error = Failed to connect to D-Bus system bus: {$error}
+pk_comm_error_mid_tx = PackageKit daemon unexpectedly disconnected or crashed mid-transaction.
+    Your system is likely in an inconsistent state and requires repairing.
+    Please quit ATM and run `apt install -f` in your terminal to fix the problem.
+
+    Error message: {$error}
 pk_comm_error = Unable to communicate with the PackageKit daemon: {$error}
 pk_tx_error = PackageKit daemon reported an error: {$error}
 pk_comm_no_response = PackageKit daemon did not return a response.
 pk_invalid_id = Package identifier "{$name}" is invalid. This is a bug, please report this issue to https://github.com/AOSC-Dev/atm/issues/new.
 
-exe_download = [{$curr}/{$total}] Downloading {$name}...
-exe_verify = [{$curr}/{$total}] Verifying {$name}...
+exe-title = Transaction In-Progress
+exe-overall = Overall Progress:
+exe_download = Downloading {$name}...
+exe-install = Installing {$name}...
+#exe_verify = [{$curr}/{$total}] Verifying {$name}...
 exe_download_file_error = Download failed: {$name}
 exe_download_error = Unable to download files
 #exe_verify_error = Verification failed: {$name}

@@ -1,7 +1,6 @@
 use std::{collections::HashSet, env::consts::ARCH, fs::File, path::Path};
 
 use anyhow::{anyhow, Result};
-use clap::crate_version;
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 
@@ -51,21 +50,6 @@ pub fn filter_topics(topics: TopicManifests) -> Result<TopicManifests> {
     }
 
     Ok(filtered)
-}
-
-pub fn make_new_client() -> Result<Client> {
-    Ok(Client::builder()
-        .user_agent(format!("ATM/{}", crate_version!()))
-        .build()?)
-}
-
-pub fn fetch_url(client: &Client, url: &str, path: &Path) -> Result<()> {
-    let mut f = File::create(path)?;
-    let mut resp = client.get(url).send()?;
-    resp.error_for_status_ref()?;
-    resp.copy_to(&mut f)?;
-
-    Ok(())
 }
 
 #[test]

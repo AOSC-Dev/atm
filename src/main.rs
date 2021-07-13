@@ -1,3 +1,9 @@
+use anyhow::Result;
+use cursive::utils::Counter;
+use cursive::views::ProgressBar;
+use std::rc::Rc;
+use std::sync::Arc;
+use std::thread;
 use std::time::Duration;
 use std::{cmp::Ordering, collections::HashSet};
 use std::{path::Path, sync::mpsc};
@@ -95,12 +101,25 @@ fn show_error(siv: &mut Cursive, msg: &str) {
     );
 }
 
-fn show_tx_details(siv: &mut Cursive, meta: &[PkPackage]) {
+fn show_finished(siv: &mut Cursive) {
+    siv.add_layer(
+        Dialog::around(TextView::new(fl!("apt_finished")))
+            .title(fl!("message"))
+            .button(fl!("ok"), |s| {
+                s.pop_layer();
+            })
+            .padding_lrtb(2, 2, 1, 1),
+    );
+}
+
+fn show_tx_details(siv: &mut Cursive, not_found: &[String], meta: &[PkPackage]) {
     siv.add_layer(
         Dialog::around(
-            TextView::new(unwrap_or_show_error!(siv, { pk::get_task_details(meta) }))
-                .scrollable()
-                .scroll_y(true),
+            TextView::new(unwrap_or_show_error!(siv, {
+                pk::get_task_details(not_found, meta)
+            }))
+            .scrollable()
+            .scroll_y(true),
         )
         .title(fl!("tx_title"))
         .button(fl!("ok"), |s| {
@@ -108,6 +127,87 @@ fn show_tx_details(siv: &mut Cursive, meta: &[PkPackage]) {
         })
         .padding_lrtb(2, 2, 1, 1),
     );
+}
+
+fn commit_transactions(siv: &mut Cursive, meta: &[PkPackage]) {
+    if meta.is_empty() {
+        siv.cb_sink().send(Box::new(show_finished)).unwrap();
+        return;
+    }
+
+    let (progress_tx, progress_rx) = mpsc::channel();
+    siv.set_autorefresh(true);
+    let cb_sink = siv.cb_sink().clone();
+    let package_ids = meta
+        .iter()
+        .map(|m| m.package_id.clone())
+        .collect::<Vec<_>>();
+    // UI components
+    let item_counter = Counter::new(0);
+    let overall_counter = Counter::new(0);
+    let mut status_message = TextView::new("");
+    let status_text = Arc::new(status_message.get_shared_content());
+    siv.add_layer(
+        Dialog::around(
+            LinearLayout::vertical()
+                .child(status_message)
+                .child(ProgressBar::new().max(100).with_value(item_counter.clone()))
+                .child(TextView::new(fl!("exe-overall")))
+                .child(
+                    ProgressBar::new()
+                        .max(100)
+                        .with_value(overall_counter.clone()),
+                ),
+        )
+        .title(fl!("exe-title")),
+    );
+    // actual execution
+    let transaction_thread = thread::spawn(move || -> Result<()> {
+        let conn = pk::create_dbus_connection()?;
+        let proxy = pk::connect_packagekit(&conn)?;
+        let transaction = pk::create_transaction(&proxy)?;
+        let package_ids = package_ids.iter().map(|m| m.as_str()).collect::<Vec<_>>();
+        pk::execute_transaction(&transaction, &package_ids, progress_tx)?;
+
+        Ok(())
+    });
+    thread::spawn(move || loop {
+        if let Ok(progress) = progress_rx.recv() {
+            match progress {
+                pk::PkDisplayProgress::Package(id, status, pct) => {
+                    let name = pk::humanize_package_id(&id);
+                    let status_message = match status {
+                        pk::PK_STATUS_ENUM_DOWNLOAD => fl!("exe_download", name = name),
+                        pk::PK_STATUS_ENUM_INSTALL => fl!("exe-install", name = name),
+                        _ => fl!("exe-install", name = name),
+                    };
+                    item_counter.set(pct as usize);
+                    status_text.set_content(status_message);
+                }
+                pk::PkDisplayProgress::Overall(pct) => {
+                    if pct < 101 {
+                        overall_counter.set(pct as usize);
+                    }
+                }
+            }
+        } else {
+            let result = transaction_thread.join().unwrap();
+            match result {
+                Ok(()) => cb_sink
+                    .send(Box::new(|s| {
+                        s.pop_layer();
+                        show_finished(s);
+                    }))
+                    .unwrap(),
+                Err(e) => cb_sink
+                    .send(Box::new(move |s| {
+                        show_error(s, &fl!("pk_comm_error_mid_tx", error = e.to_string()))
+                    }))
+                    .unwrap(),
+            }
+            return;
+        }
+    });
 }
 
 fn commit_changes(siv: &mut Cursive) {
@@ -151,27 +251,31 @@ fn commit_changes(siv: &mut Cursive) {
                 .map_err(|e| fl!("pk_dbus_error", error = e.to_string()))?;
             let proxy = pk::connect_packagekit(&conn)
                 .map_err(|e| fl!("pk_comm_error", error = e.to_string()))?;
-            let (not_found, tasks) =
-                pm::switch_topics(&proxy, &reinstall).map_err(|e| e.to_string())?;
+            let (not_found, tasks) = pm::switch_topics(&proxy, &reinstall)
+                .map_err(|e| fl!("pk_tx_error", error = e.to_string()))?;
             let proxy = pk::create_transaction(&proxy)
                 .map_err(|e| fl!("pk_comm_error", error = e.to_string()))?;
             let tasks = tasks.iter().map(|t| t.as_str()).collect::<Vec<_>>();
-            let transaction =
-                pk::get_transaction_steps(&proxy, &tasks).map_err(|e| e.to_string())?;
+            let transaction = pk::get_transaction_steps(&proxy, &tasks)
+                .map_err(|e| fl!("pk_tx_error", error = e.to_string()))?;
 
-            Ok(transaction)
+            Ok((not_found, transaction))
         },
-        |t| {
-            let summary = pk::get_task_summary(&t);
+        |(n, t)| {
+            let summary = pk::get_task_summary(&n, &t);
+            let transactions = Rc::new(t);
+            let transactions_copy = Rc::clone(&transactions);
             Dialog::around(TextView::new(summary))
                 .title(fl!("message"))
                 .button(fl!("exit"), |s| {
                     s.pop_layer();
                 })
-                .button(fl!("details"), move |s| show_tx_details(s, &t))
+                .button(fl!("details"), move |s| {
+                    show_tx_details(s, &n, &transactions)
+                })
                 .button(fl!("proceed"), move |s| {
                     s.pop_layer();
-                    todo!()
+                    commit_transactions(s, &transactions_copy);
                 })
                 .padding_lrtb(2, 2, 1, 1)
         },
@@ -243,7 +347,9 @@ fn fetch_manifest(siv: &mut CursiveRunner<&mut Cursive>) {
 }
 
 fn main() {
+    let cookie = pk::take_wake_lock().ok();
     let mut siv = cursive::default();
     fetch_manifest(&mut siv.runner());
     siv.run();
+    drop(cookie);
 }

@@ -10,12 +10,13 @@ use std::{
         mpsc::{channel, Sender},
         Arc,
     },
+    thread::{self, JoinHandle},
     time::Duration,
 };
 
 use anyhow::{anyhow, Result};
 use dbus::{
-    blocking::{Connection, Proxy},
+    blocking::{stdintf::org_freedesktop_dbus::Properties, Connection, Proxy},
     Message,
 };
 use packagekit::*;
@@ -25,10 +26,14 @@ use crate::fl;
 
 pub type PkPackage = OrgFreedesktopPackageKitTransactionPackage;
 pub type PkError = OrgFreedesktopPackageKitTransactionErrorCode;
+pub type PkProgress = OrgFreedesktopPackageKitTransactionItemProgress;
 
 const PACKAGEKIT_DEST: &str = "org.freedesktop.PackageKit";
-const PACKAGEKIT_TX_DEST: &str = "org.freedesktop.PackageKit.Transaction";
 const PACKAGEKIT_PATH: &str = "/org/freedesktop/PackageKit";
+const LOGIN1_DEST: &str = "org.freedesktop.login1";
+const LOGIN1_PATH: &str = "/org/freedesktop/login1";
+const UPOWER_DEST: &str = "org.freedesktop.UPower";
+const UPOWER_PATH: &str = "/org/freedesktop/UPower";
 
 // PackageKit enumeration constants (could be OR'ed)
 const PK_FILTER_ENUM_NEWEST: u32 = 1 << 16;
@@ -38,6 +43,10 @@ const PK_TRANSACTION_FLAG_ENUM_SIMULATE: u32 = 1 << 2;
 const PK_TRANSACTION_FLAG_ENUM_ALLOW_REINSTALL: u32 = 1 << 4;
 const PK_TRANSACTION_FLAG_ENUM_ALLOW_DOWNGRADE: u32 = 1 << 6;
 // PackageKit informational constants (literal values)
+const PK_NETWORK_ENUM_MOBILE: u8 = 5;
+pub const PK_STATUS_ENUM_SETUP: u8 = 2;
+pub const PK_STATUS_ENUM_DOWNLOAD: u8 = 8;
+pub const PK_STATUS_ENUM_INSTALL: u8 = 9;
 const PK_INFO_ENUM_INSTALLED: u8 = 1;
 const PK_INFO_ENUM_AVAILABLE: u8 = 2;
 const PK_INFO_ENUM_UPDATING: u8 = 11;
@@ -52,6 +61,23 @@ pub struct PkPackgeId<'a> {
     version: &'a str,
     arch: &'a str,
     data: &'a str,
+}
+
+pub enum PkDisplayProgress {
+    /// Individual package progress (package_id, PK_STATUS, progress %)
+    Package(String, u8, u32),
+    /// Overall transaction progress (progress %)
+    Overall(u32),
+}
+
+#[inline]
+pub fn humanize_package_id(package_id: &str) -> String {
+    let result = parse_package_id(package_id);
+    if let Some(result) = result {
+        format!("{} ({})", result.name, result.version)
+    } else {
+        "? (?)".to_string()
+    }
 }
 
 fn parse_package_id<'a>(package_id: &'a str) -> Option<PkPackgeId<'a>> {
@@ -127,13 +153,12 @@ fn wait_for_exit_signal<F: FnOnce(&Proxy<&Connection>) -> Result<()>>(
     func: F,
 ) -> Result<()> {
     let run = Arc::new(AtomicBool::new(true));
-    let run_clone = run.clone();
     let (error_tx, error_rx) = channel();
-    register_exit_handler(run, error_tx, proxy)?;
+    register_exit_handler(run.clone(), error_tx, proxy)?;
     // execute the callback function to start the transaction
     func(proxy)?;
     // process incoming payloads
-    while run_clone.load(Ordering::SeqCst) {
+    while run.load(Ordering::SeqCst) {
         // TODO: have a hard limit on timeouts to prevent deadlock
         proxy.connection.process(Duration::from_millis(1000))?;
     }
@@ -236,6 +261,10 @@ pub fn get_transaction_steps(
     proxy: &Proxy<&Connection>,
     package_ids: &[&str],
 ) -> Result<Vec<PkPackage>> {
+    if package_ids.is_empty() {
+        return Ok(vec![]);
+    }
+
     collect_packages(proxy, |proxy| {
         proxy.install_packages(
             (PK_TRANSACTION_FLAG_ENUM_SIMULATE
@@ -248,7 +277,68 @@ pub fn get_transaction_steps(
     })
 }
 
-pub fn get_task_summary(meta: &[PkPackage]) -> String {
+/// Execute a transaction with progress monitoring
+pub fn execute_transaction(
+    proxy: &Proxy<&Connection>,
+    package_ids: &[&str],
+    progress_tx: Sender<PkDisplayProgress>,
+) -> Result<()> {
+    use dbus::arg::RefArg;
+    use dbus::blocking::stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged;
+
+    let run = Arc::new(AtomicBool::new(true));
+    let progress_tx_clone = progress_tx.clone();
+    let (error_tx, error_rx) = channel();
+    register_exit_handler(run.clone(), error_tx, proxy)?;
+    // handle individual transaction item (single package progress)
+    proxy.match_signal(move |item: PkProgress, _: &Connection, _: &Message| {
+        progress_tx
+            .send(PkDisplayProgress::Package(
+                item.id,
+                item.status as u8,
+                item.percentage,
+            ))
+            .unwrap();
+
+        true
+    })?;
+    // handle overall transaction progress
+    proxy.match_signal(
+        move |prop: PropertiesPropertiesChanged, _: &Connection, _: &Message| {
+            // get the "Percentage" properties from the change signal
+            // if the changed_properties does not contain our interest, just ignore it
+            if let Some(progress) = prop
+                .changed_properties
+                .get("Percentage")
+                .and_then(|p| p.as_u64())
+            {
+                progress_tx_clone
+                    .send(PkDisplayProgress::Overall(progress as u32))
+                    .unwrap();
+            }
+
+            true
+        },
+    )?;
+    // start transaction
+    proxy.install_packages(
+        (PK_TRANSACTION_FLAG_ENUM_ALLOW_REINSTALL | PK_TRANSACTION_FLAG_ENUM_ALLOW_DOWNGRADE)
+            as u64,
+        package_ids.to_vec(),
+    )?;
+    // process incoming payloads
+    while run.load(Ordering::SeqCst) {
+        // TODO: have a hard limit on timeouts to prevent deadlock
+        proxy.connection.process(Duration::from_millis(1000))?;
+    }
+    if let Ok(e) = error_rx.try_recv() {
+        return Err(anyhow!("{}: {}", e.code, e.details));
+    }
+
+    Ok(())
+}
+
+pub fn get_task_summary(not_found: &[String], meta: &[PkPackage]) -> String {
     let mut installs = 0usize;
     let mut updates = 0usize;
     let mut erases = 0usize;
@@ -263,6 +353,10 @@ pub fn get_task_summary(meta: &[PkPackage]) -> String {
         }
     }
 
+    if not_found.len() > 0 {
+        summary += &fl!("no_stable_version", count = not_found.len());
+        summary.push('\n');
+    }
     if installs > 0 {
         summary += &fl!("install_count", count = installs);
         summary.push('\n');
@@ -276,15 +370,26 @@ pub fn get_task_summary(meta: &[PkPackage]) -> String {
         summary.push('\n');
     }
 
+    if installs < 1 && erases < 1 && updates < 1 {
+        summary += &fl!("nothing");
+        summary.push('\n');
+    }
+
     summary
 }
 
-pub fn get_task_details(meta: &[PkPackage]) -> Result<String> {
+pub fn get_task_details(not_found: &[String], meta: &[PkPackage]) -> Result<String> {
     let mut output = fl!("tx_body");
     output.push_str("\n\n");
 
+    for name in not_found {
+        output += &fl!("tx_hold", package = name.as_str());
+        output.push('\n');
+    }
+
     for m in meta {
-        let parsed = parse_package_id(&m.package_id).ok_or_else(|| anyhow!("Invalid package id"))?;
+        let parsed =
+            parse_package_id(&m.package_id).ok_or_else(|| anyhow!("Invalid package id"))?;
         let name = parsed.name;
         let version = parsed.version;
         match m.info as u8 {
@@ -304,4 +409,29 @@ pub fn get_task_details(meta: &[PkPackage]) -> Result<String> {
     }
 
     Ok(output)
+}
+
+/// Take the wake lock and prevent the system from sleeping. Drop the returned file handle to release the lock.
+pub fn take_wake_lock() -> Result<dbus::arg::OwnedFd> {
+    let conn = Connection::new_system()?;
+    let proxy = conn.with_proxy(LOGIN1_DEST, LOGIN1_PATH, Duration::from_secs(3));
+    let (cookie,): (dbus::arg::OwnedFd,) = proxy.method_call(
+        "org.freedesktop.login1.Manager",
+        "Inhibit",
+        ("shutdown:sleep", "atm", fl!("pk_inhibit_message"), "block"),
+    )?;
+
+    Ok(cookie)
+}
+
+pub fn is_using_battery() -> Result<bool> {
+    let conn = Connection::new_system()?;
+    let proxy = conn.with_proxy(UPOWER_DEST, UPOWER_PATH, Duration::from_secs(3));
+    let result: bool = proxy.get(UPOWER_DEST, "OnBattery")?;
+
+    Ok(result)
+}
+
+pub fn is_metered_network(proxy: &Proxy<&Connection>) -> Result<bool> {
+    Ok(proxy.network_state()? == PK_NETWORK_ENUM_MOBILE as u32)
 }
