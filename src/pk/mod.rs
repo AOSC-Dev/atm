@@ -10,12 +10,15 @@ use std::{
         mpsc::{channel, Sender},
         Arc,
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use anyhow::{anyhow, Result};
 use dbus::{
-    blocking::{stdintf::org_freedesktop_dbus::Properties, Connection, Proxy},
+    blocking::{
+        stdintf::org_freedesktop_dbus::{Peer, Properties},
+        Connection, Proxy,
+    },
     Message,
 };
 use packagekit::*;
@@ -332,13 +335,20 @@ pub fn execute_transaction(
             as u64,
         package_ids.to_vec(),
     )?;
+    let mut last_received = Instant::now();
     // process incoming payloads
     while run.load(Ordering::SeqCst) {
         // TODO: have a hard limit on timeouts to prevent deadlock
         proxy.connection.process(Duration::from_millis(1000))?;
+        if last_received.elapsed() >= Duration::from_millis(900) {
+            // are ya crashing son?
+            proxy.ping()?;
+            // update last_received
+            last_received = Instant::now();
+        }
     }
     if let Ok(e) = error_rx.try_recv() {
-        return Err(anyhow!("{}: {}", e.code, e.details));
+        return Err(anyhow!("({}): {}", e.code, e.details));
     }
 
     Ok(())
