@@ -339,10 +339,10 @@ pub fn execute_transaction(
     // process incoming payloads
     while run.load(Ordering::SeqCst) {
         // TODO: have a hard limit on timeouts to prevent deadlock
-        proxy.connection.process(Duration::from_millis(1000))?;
-        if last_received.elapsed() >= Duration::from_millis(900) {
+        proxy.connection.process(Duration::from_secs(3))?;
+        if last_received.elapsed() >= Duration::from_millis(2500) {
             // are ya crashing son?
-            proxy.ping()?;
+            proxy.status()?;
             // update last_received
             last_received = Instant::now();
         }
