@@ -230,7 +230,9 @@ pub fn find_stable_version_of(
         let candidate_parsed =
             parse_package_id(&candidate.package_id).ok_or_else(|| anyhow!("Invalid package id"))?;
         // skip packages that are not in the stable branch
-        if !candidate_parsed.data.starts_with("aosc-stable-") {
+        if !candidate_parsed.data.starts_with("aosc-stable-")
+            && !candidate_parsed.data.starts_with("installed:aosc-stable-")
+        {
             continue;
         }
         if let Some(packages) = candidates_map.get_mut(candidate_parsed.name) {
@@ -244,6 +246,11 @@ pub fn find_stable_version_of(
     for package in packages {
         if let Some(candidates) = candidates_map.get(*package) {
             if let Some(candidate) = candidates.first() {
+                if candidate.info == PK_INFO_ENUM_INSTALLED as u32 {
+                    // if the package is already installed and is at the latest stable version,
+                    // then just skip it
+                    continue;
+                }
                 result.push(candidate.package_id.clone());
                 continue;
             }
