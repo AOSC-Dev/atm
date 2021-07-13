@@ -195,12 +195,14 @@ fn commit_transactions(siv: &mut Cursive, meta: &[PkPackage]) {
             match result {
                 Ok(()) => cb_sink
                     .send(Box::new(|s| {
+                        s.set_autorefresh(false);
                         s.pop_layer();
                         show_finished(s);
                     }))
                     .unwrap(),
                 Err(e) => cb_sink
                     .send(Box::new(move |s| {
+                        s.set_autorefresh(false);
                         show_error(s, &fl!("pk_comm_error_mid_tx", error = e.to_string()))
                     }))
                     .unwrap(),
