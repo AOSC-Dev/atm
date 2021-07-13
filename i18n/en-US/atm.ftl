@@ -46,15 +46,18 @@ tx_downgrade = Downgrade: {$package} (To {$version})
 tx_erase = Erase: {$package} ({$version})
 
 pk_metered_network = You seem to be on a metered or celluar network.
-    ATM will consume a large amount of network data during the transaction.
+
+    ATM may consume a large amount of network data during the transaction.
     Do you still wish to continue?
 pk_battery = You seem to be on battery power.
-    ATM will deplete the battery rather quickly during the transaction.
+
+    ATM may deplete the battery rather quickly during the transaction.
     It is recommended to plug in the power supply to prevent sudden power failure.
     Do you still wish to continue?
 pk_inhibit_message = ATM transaction is in progress
 pk_dbus_error = Failed to connect to D-Bus system bus: {$error}
 pk_comm_error_mid_tx = PackageKit daemon unexpectedly disconnected or crashed mid-transaction.
+
     Your system is likely in an inconsistent state and requires repairing.
     Please quit ATM and run `apt install -f` in your terminal to fix the problem.
 
@@ -62,7 +65,9 @@ pk_comm_error_mid_tx = PackageKit daemon unexpectedly disconnected or crashed mi
 pk_comm_error = Unable to communicate with the PackageKit daemon: {$error}
 pk_tx_error = PackageKit daemon reported an error: {$error}
 pk_comm_no_response = PackageKit daemon did not return a response.
-pk_invalid_id = Package identifier "{$name}" is invalid. This is a bug, please report this issue to https://github.com/AOSC-Dev/atm/issues/new.
+pk_invalid_id = Package identifier "{$name}" is invalid.
+
+    This is a bug, please report this issue to https://github.com/AOSC-Dev/atm/issues/new.
 
 exe-title = Transaction In-Progress
 exe-overall = Overall Progress:
