@@ -143,7 +143,7 @@ fn commit_transactions(siv: &mut Cursive, meta: &[PkPackage]) {
     // UI components
     let item_counter = Counter::new(0);
     let overall_counter = Counter::new(0);
-    let mut status_message = TextView::new("");
+    let mut status_message = TextView::new(&fl!("exe-prepare"));
     let status_text = Arc::new(status_message.get_shared_content());
     siv.add_layer(
         Dialog::around(
