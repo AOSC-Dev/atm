@@ -16,7 +16,7 @@ use std::{
 use anyhow::{anyhow, Result};
 use dbus::{
     blocking::{
-        stdintf::org_freedesktop_dbus::{Peer, Properties},
+        stdintf::org_freedesktop_dbus::Properties,
         Connection, Proxy,
     },
     Message,
@@ -46,15 +46,15 @@ const PK_TRANSACTION_FLAG_ENUM_ALLOW_REINSTALL: u32 = 1 << 4;
 const PK_TRANSACTION_FLAG_ENUM_ALLOW_DOWNGRADE: u32 = 1 << 6;
 // PackageKit informational constants (literal values)
 const PK_NETWORK_ENUM_MOBILE: u8 = 5;
-pub const PK_STATUS_ENUM_SETUP: u8 = 2;
+// pub const PK_STATUS_ENUM_SETUP: u8 = 2;
 pub const PK_STATUS_ENUM_DOWNLOAD: u8 = 8;
 pub const PK_STATUS_ENUM_INSTALL: u8 = 9;
 const PK_INFO_ENUM_INSTALLED: u8 = 1;
-const PK_INFO_ENUM_AVAILABLE: u8 = 2;
+// const PK_INFO_ENUM_AVAILABLE: u8 = 2;
 const PK_INFO_ENUM_UPDATING: u8 = 11;
 const PK_INFO_ENUM_INSTALLING: u8 = 12;
 const PK_INFO_ENUM_REMOVING: u8 = 13;
-const PK_INFO_ENUM_OBSOLETING: u8 = 15;
+// const PK_INFO_ENUM_OBSOLETING: u8 = 15;
 const PK_INFO_ENUM_REINSTALLING: u8 = 19;
 const PK_INFO_ENUM_DOWNGRADING: u8 = 20;
 
@@ -76,7 +76,7 @@ pub enum PkDisplayProgress {
 pub fn humanize_package_id(package_id: &str) -> String {
     let result = parse_package_id(package_id);
     if let Some(result) = result {
-        format!("{} ({})", result.name, result.version)
+        format!("{} ({}) [{}]", result.name, result.version, result.arch)
     } else {
         "? (?)".to_string()
     }
@@ -193,9 +193,9 @@ pub fn create_transaction<'a>(proxy: &'a Proxy<&Connection>) -> Result<Proxy<'a,
     Ok(tx_proxy)
 }
 
-/// Get the name of the PackageKit backend (e.g. aptcc)
-pub fn get_backend_name(proxy: &Proxy<&Connection>) -> Result<String> {
-    Ok(proxy.backend_name()?)
+/// Get the ID of the Distro (e.g. debian;squeeze/sid;x86_64)
+pub fn get_distro_id(proxy: &Proxy<&Connection>) -> Result<String> {
+    Ok(proxy.distro_id()?)
 }
 
 /// Refresh repository cache (forcibly refreshes the caches)
@@ -338,8 +338,9 @@ pub fn execute_transaction(
     let mut last_received = Instant::now();
     // process incoming payloads
     while run.load(Ordering::SeqCst) {
-        // TODO: have a hard limit on timeouts to prevent deadlock
         proxy.connection.process(Duration::from_secs(3))?;
+        // Ping the PackageKit daemon if signal is not received in time
+        // to see if it is still alive
         if last_received.elapsed() >= Duration::from_millis(2500) {
             // are ya crashing son?
             proxy.status()?;
