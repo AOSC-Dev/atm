@@ -251,10 +251,9 @@ fn check_battery_level(siv: &mut Cursive) {
 }
 
 fn commit_changes(siv: &mut Cursive) {
-    let mut previous: Option<Vec<network::TopicManifest>> = None;
-    if let Some(prev) = siv.user_data::<Vec<network::TopicManifest>>() {
-        previous = Some(prev.clone());
-    }
+    let previous: Option<Vec<network::TopicManifest>> = siv
+        .user_data::<Vec<network::TopicManifest>>()
+        .map(|x| x.clone());
     let mut reinstall = Vec::new();
     let (tx, rx) = mpsc::channel();
     siv.call_on_name(
@@ -272,7 +271,7 @@ fn commit_changes(siv: &mut Cursive) {
             // figure out what packages to re-install
             if let Some(previous) = previous {
                 for item in previous {
-                    if !lookup.contains(&item.name) {
+                    if item.enabled && !lookup.contains(&item.name) {
                         reinstall.push(item);
                     }
                 }
