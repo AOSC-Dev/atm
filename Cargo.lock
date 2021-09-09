@@ -51,7 +51,7 @@ checksum = "06e97b4e522f9e55523001238ac59d13a8603af57f69980de5d8de4bbbe8ada6"
 
 [[package]]
 name = "atm"
-version = "0.4.3-alpha.0"
+version = "0.4.3"
 dependencies = [
  "anyhow",
  "chrono",
