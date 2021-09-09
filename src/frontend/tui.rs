@@ -8,14 +8,16 @@ use std::thread;
 use std::time::Duration;
 use std::{cmp::Ordering, collections::HashSet};
 
-use chrono::prelude::*;
 use cursive::{align::HAlign, traits::*, views::DummyView, views::LinearLayout};
 use cursive::{views::Dialog, views::TextView, Cursive, CursiveRunner};
 use cursive_async_view::AsyncView;
 use cursive_table_view::{TableView, TableViewItem};
+use time::{format_description::FormatItem, macros::format_description};
 
 use crate::pk::{self, PkPackage};
 use crate::{fl, network, pm};
+
+const DATE_FORMAT: &[FormatItem] = format_description!("[year]-[month repr:numerical]-[day]");
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 enum TopicColumn {
@@ -23,6 +25,11 @@ enum TopicColumn {
     Name,
     Date,
     Description,
+}
+
+#[inline]
+fn format_timestamp(t: i64) -> Result<String> {
+    Ok(time::OffsetDateTime::from_unix_timestamp(t)?.format(&DATE_FORMAT)?)
 }
 
 impl TableViewItem<TopicColumn> for network::TopicManifest {
@@ -43,7 +50,7 @@ impl TableViewItem<TopicColumn> for network::TopicManifest {
                 }
                 name
             }
-            TopicColumn::Date => Utc.timestamp(self.date, 0).format("%Y-%m-%d").to_string(),
+            TopicColumn::Date => format_timestamp(self.date).unwrap_or_else(|_| "?".to_string()),
             TopicColumn::Description => self.description.clone().unwrap_or_default(),
         }
     }
