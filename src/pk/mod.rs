@@ -193,11 +193,6 @@ pub fn create_transaction<'a>(proxy: &'a Proxy<&Connection>) -> Result<Proxy<'a,
     Ok(tx_proxy)
 }
 
-/// Get the ID of the Distro (e.g. debian;squeeze/sid;x86_64)
-pub fn get_distro_id(proxy: &Proxy<&Connection>) -> Result<String> {
-    Ok(proxy.distro_id()?)
-}
-
 /// Refresh repository cache (forcibly refreshes the caches)
 pub fn refresh_cache(proxy: &Proxy<&Connection>) -> Result<()> {
     wait_for_exit_signal(proxy, |proxy| Ok(proxy.refresh_cache(true)?))
