@@ -80,6 +80,7 @@ pub fn close_topics(topics: &[TopicManifest]) -> Result<Vec<String>> {
     Ok(remove)
 }
 
+/// Returns the list of enrolled topics
 fn get_previous_topics() -> Result<PreviousTopics> {
     let f = fs::read(STATE_PATH)?;
 

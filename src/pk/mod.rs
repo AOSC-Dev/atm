@@ -15,10 +15,7 @@ use std::{
 
 use anyhow::{anyhow, Result};
 use dbus::{
-    blocking::{
-        stdintf::org_freedesktop_dbus::Properties,
-        Connection, Proxy,
-    },
+    blocking::{stdintf::org_freedesktop_dbus::Properties, Connection, Proxy},
     Message,
 };
 use packagekit::*;

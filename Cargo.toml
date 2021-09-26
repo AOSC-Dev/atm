@@ -16,6 +16,9 @@ log = "0.4"
 clap = "2.33"
 reqwest = { version = "0.11", features = ["json", "blocking"] }
 nom = "^7"
+nix = "0.22"
+tempfile = "3.2"
+sha2 = "0.9"
 # tui
 cursive = { version = "0.16", features = ["crossterm-backend"], default-features = false }
 cursive_table_view = { git = "https://github.com/BonsaiDen/cursive_table_view" }

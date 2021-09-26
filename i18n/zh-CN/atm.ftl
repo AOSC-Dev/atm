@@ -75,4 +75,19 @@ install_error = 安装软件包时发生错误：{$error}
 #press_enter_to_return = 请按 Enter 键返回主菜单。
 press_enter_to_bail = 请按 Enter 键退出程序。
 
+## CLI messages
+
 needs-root = Please run me as root!
+topic-table-hint = Enrolled topics are marked with a `*` character.
+fetch-error-fallback = [!] Failed to fetch available topics. Only enrolled topics are shown.
+
+## Authentication messages
+
+await-authentication = Waiting for authentication to finish ...
+authentication-failure = Authentication failed: {$reason}
+-run-me-as-root-workaround = Your system is not modified.
+    Please run ATM as root in your terminal to workaround this issue.
+sudo-failure = ATM can not find any privilege escalation facilities in your system.
+    { -run-me-as-root-workaround }
+headless-sudo-unsupported = ATM does not support headless privilege escalation.
+    { -run-me-as-root-workaround }
