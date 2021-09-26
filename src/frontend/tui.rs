@@ -14,6 +14,7 @@ use cursive_async_view::AsyncView;
 use cursive_table_view::{TableView, TableViewItem};
 use time::{format_description::FormatItem, macros::format_description};
 
+use super::cli::privileged_write_source_list;
 use crate::pk::{self, PkPackage};
 use crate::{fl, network, pm};
 
@@ -283,7 +284,7 @@ fn commit_changes(siv: &mut Cursive) {
                     }
                 }
             }
-            tx.send((pm::write_source_list(&enabled), items.clone()))
+            tx.send((privileged_write_source_list(&enabled), items.clone()))
                 .ok();
         },
     );
