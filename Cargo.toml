@@ -26,6 +26,7 @@ cursive-async-view = "0.5"
 indexmap = { version ="^1", features = ["serde-1"] }
 # cli
 argh = "0.1"
+tabwriter = "^1"
 # packagekit related
 dbus = "0.9"
 # i18n

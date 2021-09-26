@@ -4,6 +4,7 @@ use anyhow::{anyhow, Result};
 use argh::FromArgs;
 use sha2::Digest;
 
+use super::format_timestamp;
 use crate::{fl, network, pm};
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -11,8 +12,8 @@ use crate::{fl, network, pm};
 #[argh(subcommand, name = "add")]
 pub(crate) struct TopicAdd {
     /// name of the topic
-    #[argh(option)]
-    pub name: String,
+    #[argh(positional)]
+    pub name: Vec<String>,
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -20,8 +21,8 @@ pub(crate) struct TopicAdd {
 #[argh(subcommand, name = "remove")]
 pub(crate) struct TopicRemove {
     /// name of the topic
-    #[argh(option)]
-    pub name: String,
+    #[argh(positional)]
+    pub name: Vec<String>,
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -102,6 +103,59 @@ pub fn privileged_write_source_list(topics: &[&network::TopicManifest]) -> Resul
     Ok(())
 }
 
+fn fetch_available_topics() -> Result<network::TopicManifests> {
+    let topics = network::fetch_topics(&format!(
+        "{}{}",
+        pm::MIRROR_URL.to_string(),
+        "debs/manifest/topics.json"
+    ))?;
+
+    network::filter_topics(topics)
+}
+
+fn format_manifests(topics: network::TopicManifests) {
+    use std::io::Write;
+
+    let mut formatter = tabwriter::TabWriter::new(std::io::stderr());
+    write!(
+        &mut formatter,
+        "  {}\t{}\t{}\n",
+        fl!("name"),
+        fl!("date"),
+        fl!("description")
+    )
+    .unwrap();
+    for topic in topics {
+        write!(
+            &mut formatter,
+            "{} {}\t{}\t{}\n",
+            if topic.enabled { "*" } else { " " },
+            topic.name,
+            format_timestamp(topic.date).unwrap_or_else(|_| "?".to_string()),
+            topic.description.unwrap_or_default()
+        )
+        .unwrap();
+    }
+    formatter.flush().unwrap();
+}
+
+fn list_topics() {
+    let mut fallback = false;
+    eprintln!("{}", fl!("refresh_manifest"));
+    let available = fetch_available_topics().unwrap_or_else(|_| {
+        fallback = true;
+        Vec::new()
+    });
+    let mut topics = pm::get_display_listing(available);
+    topics.sort_unstable_by_key(|t| !t.enabled);
+    format_manifests(topics);
+    if fallback {
+        eprintln!("{}", fl!("fetch-error-fallback"));
+    } else {
+        eprintln!("\n{}", fl!("topic-table-hint"));
+    }
+}
+
 fn refresh_topics<P: AsRef<Path>>(filename: Option<P>, chksum: &Option<String>) -> Result<()> {
     let topics = match filename {
         Some(filename) => {
@@ -133,6 +187,32 @@ fn refresh_topics<P: AsRef<Path>>(filename: Option<P>, chksum: &Option<String>) 
     Ok(())
 }
 
+fn add_topics(topics_to_add: &[String]) -> Result<()> {
+    eprintln!("{}", fl!("refresh_manifest"));
+    let available = fetch_available_topics()?;
+    let mut topics = pm::get_display_listing(available);
+    for topic in topics.iter_mut() {
+        topic.enabled = topics_to_add.contains(&topic.name);
+    }
+    let topics_ref = topics.iter().map(|t| t).collect::<Vec<_>>();
+    pm::write_source_list(&topics_ref)?;
+    println!("{}", fl!("apt_finished"));
+
+    Ok(())
+}
+
+fn remove_topics(topics_to_remove: &[String]) -> Result<()> {
+    let mut topics = pm::get_display_listing(Vec::new());
+    topics
+        .iter_mut()
+        .for_each(|t| t.enabled = !topics_to_remove.contains(&t.name));
+    let topics_ref = topics.iter().map(|t| t).collect::<Vec<_>>();
+    pm::write_source_list(&topics_ref)?;
+    println!("{}", fl!("apt_finished"));
+
+    Ok(())
+}
+
 /// CLI parser and main function.
 /// Returns `false` if no command-line argument is provided.
 pub fn cli_main() -> bool {
@@ -142,15 +222,25 @@ pub fn cli_main() -> bool {
     }
     let commands = args.command.unwrap();
     match commands {
-        ATMCommand::List(_) => todo!(),
+        ATMCommand::List(_) => list_topics(),
         ATMCommand::Refresh(args) => {
             if let Err(e) = refresh_topics(args.filename, &args.checksum) {
                 eprintln!("{}", e);
                 process::exit(1);
             }
         }
-        ATMCommand::Add(_) => todo!(),
-        ATMCommand::Remove(_) => todo!(),
+        ATMCommand::Add(topics) => {
+            if let Err(e) = add_topics(&topics.name) {
+                eprintln!("{}", e);
+                process::exit(1);
+            }
+        }
+        ATMCommand::Remove(topics) => {
+            if let Err(e) = remove_topics(&topics.name) {
+                eprintln!("{}", e);
+                process::exit(1);
+            }
+        }
     }
 
     true

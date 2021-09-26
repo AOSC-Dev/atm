@@ -12,13 +12,11 @@ use cursive::{align::HAlign, traits::*, views::DummyView, views::LinearLayout};
 use cursive::{views::Dialog, views::TextView, Cursive, CursiveRunner};
 use cursive_async_view::AsyncView;
 use cursive_table_view::{TableView, TableViewItem};
-use time::{format_description::FormatItem, macros::format_description};
 
 use super::cli::privileged_write_source_list;
+use super::format_timestamp;
 use crate::pk::{self, PkPackage};
 use crate::{fl, network, pm};
-
-const DATE_FORMAT: &[FormatItem] = format_description!("[year]-[month repr:numerical]-[day]");
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 enum TopicColumn {
@@ -26,11 +24,6 @@ enum TopicColumn {
     Name,
     Date,
     Description,
-}
-
-#[inline]
-fn format_timestamp(t: i64) -> Result<String> {
-    Ok(time::OffsetDateTime::from_unix_timestamp(t)?.format(&DATE_FORMAT)?)
 }
 
 impl TableViewItem<TopicColumn> for network::TopicManifest {
