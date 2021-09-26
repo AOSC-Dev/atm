@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD polkit Policy Configuration 1.0//EN"
+"http://www.freedesktop.org/software/polkit/policyconfig-1.dtd">
+<policyconfig>
+
+  <vendor>Anthon Open Source Community</vendor>
+  <vendor_url>https://github.com/mesonbuild/meson</vendor_url>
+
+  <action id="io.aosc.atm.apply.run">
+    <description>Apply ATM configurations</description>
+    <description xml:lang="zh_CN">应用 ATM 的配置</description>
+    <message>Authentication is required to apply topic changes</message>
+    <message xml:lang="zh_CN">ATM 需要您的授权才能应用分支修改</message>
+    <icon_name>preferences-system</icon_name>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/atm</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">refresh</annotate>
+  </action>
+
+</policyconfig>
