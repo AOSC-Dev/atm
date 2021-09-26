@@ -9,7 +9,6 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0"
 time = { version = "0.3", features = ["formatting", "macros"] }
-chrono = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 lazy_static = "1.4"
@@ -17,10 +16,13 @@ log = "0.4"
 clap = "2.33"
 reqwest = { version = "0.11", features = ["json", "blocking"] }
 nom = "^7"
+# tui
 cursive = { version = "0.16", features = ["crossterm-backend"], default-features = false }
 cursive_table_view = { git = "https://github.com/BonsaiDen/cursive_table_view" }
 cursive-async-view = "0.5"
 indexmap = { version ="^1", features = ["serde-1"] }
+# cli
+argh = "0.1"
 # packagekit related
 dbus = "0.9"
 # i18n

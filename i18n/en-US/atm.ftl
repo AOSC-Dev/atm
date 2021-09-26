@@ -87,3 +87,5 @@ install_error = An error occurred while installing packages: {$error}
 
 #press_enter_to_return = Press Enter to return to the main menu.
 press_enter_to_bail = Press Enter to return to quit.
+
+needs-root = Please run me as root!
