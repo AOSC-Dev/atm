@@ -91,7 +91,7 @@ press_enter_to_bail = Press Enter to return to quit.
 ## CLI messages
 
 needs-root = Please run me as root!
-topic-table-hint = Enrolled topics are marked with a `*` character.
+topic-table-hint = Selected or enrolled topics are marked with a `*` character.
 fetch-error-fallback = [!] Failed to fetch available topics. Only enrolled topics are shown.
 
 ## Authentication messages
@@ -99,8 +99,11 @@ fetch-error-fallback = [!] Failed to fetch available topics. Only enrolled topic
 await-authentication = Waiting for authentication to finish ...
 authentication-failure = Authentication failed: {$reason}
 -run-me-as-root-workaround = Your system is not modified.
+
     Please run ATM as root in your terminal to workaround this issue.
 sudo-failure = ATM can not find any privilege escalation facilities in your system.
+
     { -run-me-as-root-workaround }
 headless-sudo-unsupported = ATM does not support headless privilege escalation.
+
     { -run-me-as-root-workaround }
