@@ -77,17 +77,20 @@ press_enter_to_bail = 请按 Enter 键退出程序。
 
 ## CLI messages
 
-needs-root = Please run me as root!
-topic-table-hint = Enrolled topics are marked with a `*` character.
-fetch-error-fallback = [!] Failed to fetch available topics. Only enrolled topics are shown.
+needs-root = 请使用 root 用户运行本程序！
+topic-table-hint = `*` 标记代表已选中或订阅该尝鲜分支。
+fetch-error-fallback = [!] 无法获取可用尝鲜分支列表，目前只显示了已订阅的尝鲜分支。
 
 ## Authentication messages
 
-await-authentication = Waiting for authentication to finish ...
-authentication-failure = Authentication failed: {$reason}
--run-me-as-root-workaround = Your system is not modified.
-    Please run ATM as root in your terminal to workaround this issue.
-sudo-failure = ATM can not find any privilege escalation facilities in your system.
+await-authentication = 正在等待认证 ……
+authentication-failure = 认证失败：{$reason}
+-run-me-as-root-workaround = 目前的更改尚未生效。
+
+    请使用 root 用户运行 ATM 解决此问题。
+sudo-failure = ATM 无法找到任何可用的提权工具。
+
     { -run-me-as-root-workaround }
-headless-sudo-unsupported = ATM does not support headless privilege escalation.
+headless-sudo-unsupported = ATM 不支持无交互提权。
+
     { -run-me-as-root-workaround }
