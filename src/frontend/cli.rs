@@ -26,7 +26,7 @@ pub(crate) struct TopicRemove {
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
-/// exit from a topic
+/// refresh APT configurations
 #[argh(subcommand, name = "refresh")]
 pub(crate) struct RefreshList {
     /// filename of the topic list file (optional)
@@ -59,6 +59,17 @@ pub(crate) struct ATM {
 }
 
 // === end of argh constructs
+
+#[inline]
+fn needs_root() -> Result<()> {
+    use nix::unistd::geteuid;
+
+    if !geteuid().is_root() {
+        Err(anyhow!(fl!("needs-root")))
+    } else {
+        Ok(())
+    }
+}
 
 /// Escalate permissions using Polkit-1 and write configuration file
 pub fn privileged_write_source_list(topics: &[&network::TopicManifest]) -> Result<()> {
@@ -157,6 +168,7 @@ fn list_topics() {
 }
 
 fn refresh_topics<P: AsRef<Path>>(filename: Option<P>, chksum: &Option<String>) -> Result<()> {
+    needs_root()?;
     let topics = match filename {
         Some(filename) => {
             let mut f = File::open(filename)?;
@@ -188,6 +200,7 @@ fn refresh_topics<P: AsRef<Path>>(filename: Option<P>, chksum: &Option<String>) 
 }
 
 fn add_topics(topics_to_add: &[String]) -> Result<()> {
+    needs_root()?;
     eprintln!("{}", fl!("refresh_manifest"));
     let available = fetch_available_topics()?;
     let mut topics = pm::get_display_listing(available);
@@ -202,6 +215,7 @@ fn add_topics(topics_to_add: &[String]) -> Result<()> {
 }
 
 fn remove_topics(topics_to_remove: &[String]) -> Result<()> {
+    needs_root()?;
     let mut topics = pm::get_display_listing(Vec::new());
     topics
         .iter_mut()
