@@ -84,7 +84,6 @@ version = "0.5.1-alpha.0"
 dependencies = [
  "anyhow",
  "argh",
- "clap",
  "cursive",
  "cursive-async-view",
  "cursive_table_view",
@@ -94,7 +93,6 @@ dependencies = [
  "i18n-embed-fl",
  "indexmap",
  "lazy_static",
- "log",
  "nix",
  "nom",
  "reqwest",
