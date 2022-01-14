@@ -1,6 +1,7 @@
 use anyhow::Result;
 use cursive::utils::Counter;
 use cursive::views::ProgressBar;
+use std::process::Command;
 use std::rc::Rc;
 use std::sync::mpsc;
 use std::sync::Arc;
@@ -252,6 +253,7 @@ fn check_battery_level(siv: &mut Cursive) {
 }
 
 fn commit_changes(siv: &mut Cursive) {
+    let frontend_status = pm::get_frontend_status();
     let previous: Option<Vec<network::TopicManifest>> = siv
         .user_data::<Vec<network::TopicManifest>>()
         .map(|x| x.clone());
@@ -284,43 +286,53 @@ fn commit_changes(siv: &mut Cursive) {
     let (result, items) = unwrap_or_show_error!(siv, { rx.recv_timeout(Duration::from_secs(10)) });
     unwrap_or_show_error!(siv, { result });
     siv.set_user_data(items);
-    let loader = AsyncView::new_with_bg_creator(
-        siv,
-        move || {
-            let conn = pk::create_dbus_connection()
-                .map_err(|e| fl!("pk_dbus_error", error = e.to_string()))?;
-            let proxy = pk::connect_packagekit(&conn)
-                .map_err(|e| fl!("pk_comm_error", error = e.to_string()))?;
-            let (not_found, tasks) = pm::switch_topics(&proxy, &reinstall)
-                .map_err(|e| fl!("pk_tx_error", error = e.to_string()))?;
-            let proxy = pk::create_transaction(&proxy)
-                .map_err(|e| fl!("pk_comm_error", error = e.to_string()))?;
-            let tasks = tasks.iter().map(|t| t.as_str()).collect::<Vec<_>>();
-            let transaction = pk::get_transaction_steps(&proxy, &tasks)
-                .map_err(|e| fl!("pk_tx_error", error = e.to_string()))?;
+    if frontend_status.has_apt {
+        let loader = AsyncView::new_with_bg_creator(
+            siv,
+            move || {
+                let conn = pk::create_dbus_connection()
+                    .map_err(|e| fl!("pk_dbus_error", error = e.to_string()))?;
+                let proxy = pk::connect_packagekit(&conn)
+                    .map_err(|e| fl!("pk_comm_error", error = e.to_string()))?;
+                let (not_found, tasks) = pm::switch_topics(&proxy, &reinstall)
+                    .map_err(|e| fl!("pk_tx_error", error = e.to_string()))?;
+                let proxy = pk::create_transaction(&proxy)
+                    .map_err(|e| fl!("pk_comm_error", error = e.to_string()))?;
+                let tasks = tasks.iter().map(|t| t.as_str()).collect::<Vec<_>>();
+                let transaction = pk::get_transaction_steps(&proxy, &tasks)
+                    .map_err(|e| fl!("pk_tx_error", error = e.to_string()))?;
 
-            Ok((not_found, transaction))
-        },
-        |(n, t)| {
-            let summary = pk::get_task_summary(&n, &t);
-            let transactions = Rc::new(t);
-            let transactions_copy = Rc::clone(&transactions);
-            Dialog::around(TextView::new(summary))
-                .title(fl!("message"))
-                .button(fl!("exit"), |s| {
-                    s.pop_layer();
-                })
-                .button(fl!("details"), move |s| {
-                    show_tx_details(s, &n, &transactions)
-                })
-                .button(fl!("proceed"), move |s| {
-                    s.pop_layer();
-                    commit_transactions(s, &transactions_copy);
-                })
-                .padding_lrtb(2, 2, 1, 1)
-        },
-    );
-    siv.add_layer(loader);
+                Ok((not_found, transaction))
+            },
+            |(n, t)| {
+                let summary = pk::get_task_summary(&n, &t);
+                let transactions = Rc::new(t);
+                let transactions_copy = Rc::clone(&transactions);
+                Dialog::around(TextView::new(summary))
+                    .title(fl!("message"))
+                    .button(fl!("exit"), |s| {
+                        s.pop_layer();
+                    })
+                    .button(fl!("details"), move |s| {
+                        show_tx_details(s, &n, &transactions)
+                    })
+                    .button(fl!("proceed"), move |s| {
+                        s.pop_layer();
+                        commit_transactions(s, &transactions_copy);
+                    })
+                    .padding_lrtb(2, 2, 1, 1)
+            },
+        );
+        siv.add_layer(loader);
+    }
+    if frontend_status.has_oma {
+        Command::new("oma")
+            .arg("execute")
+            .spawn()
+            .unwrap()
+            .wait()
+            .unwrap();
+    }
 }
 
 fn fetch_manifest(siv: &mut CursiveRunner<&mut Cursive>) {
