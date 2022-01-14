@@ -87,6 +87,7 @@ install_error = An error occurred while installing packages: {$error}
 
 #press_enter_to_return = Press Enter to return to the main menu.
 press_enter_to_bail = Press Enter to return to quit.
+oma_without_root_error = Currently atm does not support omakase for use under non-root privileges!
 
 ## CLI messages
 

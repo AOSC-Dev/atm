@@ -49,9 +49,9 @@ struct OmakaseTopic {
     keys: Vec<String>,
 }
 
-struct FrontendStatus {
-    has_apt: bool,
-    has_oma: bool,
+pub struct FrontendStatus {
+    pub has_apt: bool,
+    pub has_oma: bool,
 }
 
 pub fn get_mirror_url() -> Result<String> {
@@ -215,7 +215,7 @@ fn make_omakase_config(omakase_topics: HashMap<String, OmakaseTopic>) -> Result<
     Ok(toml::to_string(&config)?)
 }
 
-fn get_frontend_status() -> FrontendStatus {
+pub fn get_frontend_status() -> FrontendStatus {
     let mut has_oma = false;
     let mut has_apt = false;
     let which_oma_output = Command::new("which").arg("oma").output();

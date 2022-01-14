@@ -74,6 +74,7 @@ install_error = 安装软件包时发生错误：{$error}
 
 #press_enter_to_return = 请按 Enter 键返回主菜单。
 press_enter_to_bail = 请按 Enter 键退出程序。
+oma_without_root_error = 目前 atm 暂不支持 omakase 在非 root 权限下使用！
 
 ## CLI messages
 

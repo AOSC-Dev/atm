@@ -82,6 +82,9 @@ pub fn privileged_write_source_list(topics: &[&network::TopicManifest]) -> Resul
         // already root
         return pm::write_source_list(topics);
     }
+    if pm::get_frontend_status().has_oma && !pm::get_frontend_status().has_apt {
+        return Err(anyhow!(fl!("oma_without_root_error")));
+    }
     if std::env::var("DISPLAY").is_err() {
         return Err(anyhow!(fl!("headless-sudo-unsupported")));
     }
