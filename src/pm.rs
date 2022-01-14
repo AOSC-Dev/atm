@@ -196,16 +196,12 @@ fn topic_to_omakase(topics: &[&TopicManifest]) -> Result<HashMap<String, Omakase
 }
 
 fn make_omakase_config(omakase_topics: HashMap<String, OmakaseTopic>) -> Result<String> {
-    let mut omakase_topics = omakase_topics;
-    let mut file = std::fs::File::open(OMAKASE_CONFIG_PATH)?;
-    let mut buf = vec![];
-    file.read_to_end(&mut buf)?;
-    let mut config: OmakaseConfig = toml::from_slice(&buf)?;
+    let mut result = HashMap::new();
     let status_data = fs::read(APT_GEN_LIST_STATUS)?;
     let status_data: AptGenListStatus = serde_json::from_slice(&status_data)?;
     for (mirror_name, url) in status_data.mirror {
         let url = format!("{}/debs", url);
-        omakase_topics.insert(
+        result.insert(
             mirror_name,
             OmakaseTopic {
                 url,
@@ -215,7 +211,12 @@ fn make_omakase_config(omakase_topics: HashMap<String, OmakaseTopic>) -> Result<
             },
         );
     }
-    config.repo = omakase_topics;
+    result = result.into_iter().chain(omakase_topics).collect();
+    let mut file = std::fs::File::open(OMAKASE_CONFIG_PATH)?;
+    let mut buf = vec![];
+    file.read_to_end(&mut buf)?;
+    let mut config: OmakaseConfig = toml::from_slice(&buf)?;
+    config.repo = result;
 
     Ok(toml::to_string(&config)?)
 }
