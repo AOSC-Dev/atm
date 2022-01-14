@@ -31,6 +31,7 @@ i18n-embed = { version = "0.13", features = ["fluent-system", "desktop-requester
 i18n-embed-fl = "0.6"
 rust-embed = "^6"
 unic-langid = "0.9"
+toml = "0.5"
 
 [build-dependencies]
 dbus-codegen = "0.9"

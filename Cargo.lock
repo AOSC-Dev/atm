@@ -103,6 +103,7 @@ dependencies = [
  "tabwriter",
  "tempfile",
  "time 0.3.3",
+ "toml",
  "unic-langid",
 ]
 
