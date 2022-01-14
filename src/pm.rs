@@ -27,6 +27,8 @@ const DEFAULT_REPO_URL: &str = "https://repo.aosc.io";
 #[derive(Deserialize, Debug)]
 struct AptGenListStatus {
     mirror: IndexMap<String, String>,
+    branch: String,
+    component: Vec<String>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -182,7 +184,7 @@ fn topic_to_omakase(topics: &[&TopicManifest]) -> Result<HashMap<String, Omakase
         result.insert(
             format!("repo.{}", topic.name),
             OmakaseTopic {
-                url: get_mirror_url()?,
+                url: format!("{}debs", get_mirror_url()?),
                 distribution: topic.name.to_owned(),
                 components: vec!["main".to_string()],
                 keys: vec!["aosc.gpg".to_string()],
@@ -199,17 +201,20 @@ fn make_omakase_config(omakase_topics: HashMap<String, OmakaseTopic>) -> Result<
     let mut buf = vec![];
     file.read_to_end(&mut buf)?;
     let mut config: OmakaseConfig = toml::from_slice(&buf)?;
-    let main_mirror = if let Some(main) = config.repo.get("main") {
-        main.to_owned()
-    } else {
-        OmakaseTopic {
-            url: get_mirror_url()?,
-            distribution: "stable".to_string(),
-            components: vec!["main".to_string()],
-            keys: vec!["aosc.gpg".to_string()],
-        }
-    };
-    omakase_topics.insert("aosc".to_string(), main_mirror);
+    let status_data = fs::read(APT_GEN_LIST_STATUS)?;
+    let status_data: AptGenListStatus = serde_json::from_slice(&status_data)?;
+    for (mirror_name, url) in status_data.mirror {
+        let url = format!("{}/debs", url);
+        omakase_topics.insert(
+            mirror_name,
+            OmakaseTopic {
+                url,
+                distribution: status_data.branch.to_owned(),
+                components: status_data.component.to_owned(),
+                keys: vec!["aosc.gpg".to_string()],
+            },
+        );
+    }
     config.repo = omakase_topics;
 
     Ok(toml::to_string(&config)?)
@@ -240,7 +245,7 @@ pub fn write_source_list(topics: &[&TopicManifest]) -> Result<()> {
         let mut f = fs::File::create(SOURCE_PATH)?;
         f.write_all(SOURCE_HEADER)?;
         f.write_all(make_topic_list(topics).as_bytes())?;
-    
+
         fs::create_dir_all(STATE_DIR)?;
         let mut f = fs::File::create(STATE_PATH)?;
         f.write_all(save_as_previous_topics(topics)?.as_bytes())?;
