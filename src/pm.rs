@@ -27,8 +27,6 @@ const DEFAULT_REPO_URL: &str = "https://repo.aosc.io";
 #[derive(Deserialize, Debug)]
 struct AptGenListStatus {
     mirror: IndexMap<String, String>,
-    branch: String,
-    component: Vec<String>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -45,10 +43,24 @@ struct OmakaseConfig {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct OmakaseTopic {
-    url: String,
+    source: OmakaseSource,
+    tag: Option<String>,
     distribution: String,
     components: Vec<String>,
     keys: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(untagged)]
+enum OmakaseSource {
+    Url(String),
+    MirrorList(OmakaseSourceMirrorList),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct OmakaseSourceMirrorList {
+    mirrorlist: String,
+    prefrred: String,
 }
 
 pub struct FrontendStatus {
@@ -184,7 +196,8 @@ fn topic_to_omakase(topics: &[&TopicManifest]) -> Result<HashMap<String, Omakase
         result.insert(
             format!("repo.{}", topic.name),
             OmakaseTopic {
-                url: format!("{}debs", get_mirror_url()?),
+                source: OmakaseSource::Url(get_mirror_url()?),
+                tag: Some("topic".to_string()),
                 distribution: topic.name.to_owned(),
                 components: vec!["main".to_string()],
                 keys: vec!["aosc.gpg".to_string()],
@@ -196,26 +209,21 @@ fn topic_to_omakase(topics: &[&TopicManifest]) -> Result<HashMap<String, Omakase
 }
 
 fn make_omakase_config(omakase_topics: HashMap<String, OmakaseTopic>) -> Result<String> {
-    let mut result = HashMap::new();
-    let status_data = fs::read(APT_GEN_LIST_STATUS)?;
-    let status_data: AptGenListStatus = serde_json::from_slice(&status_data)?;
-    for (mirror_name, url) in status_data.mirror {
-        let url = format!("{}/debs", url);
-        result.insert(
-            mirror_name,
-            OmakaseTopic {
-                url,
-                distribution: status_data.branch.to_owned(),
-                components: status_data.component.to_owned(),
-                keys: vec!["aosc.gpg".to_string()],
-            },
-        );
-    }
-    result = result.into_iter().chain(omakase_topics).collect();
     let mut file = std::fs::File::open(OMAKASE_CONFIG_PATH)?;
     let mut buf = vec![];
     file.read_to_end(&mut buf)?;
     let mut config: OmakaseConfig = toml::from_slice(&buf)?;
+    let mut result = HashMap::new();
+    for (repo_name, repo) in config.repo {
+        if let Some(tag) = &repo.tag {
+            if tag == "topic" {
+                continue;
+            }
+        }
+
+        result.insert(repo_name, repo);
+    }
+    result = result.into_iter().chain(omakase_topics).collect();
     config.repo = result;
 
     Ok(toml::to_string(&config)?)
