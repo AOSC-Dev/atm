@@ -194,7 +194,7 @@ fn topic_to_omakase(topics: &[&TopicManifest]) -> Result<HashMap<String, Omakase
     let mut result = HashMap::new();
     for topic in topics {
         result.insert(
-            format!("repo.{}", topic.name),
+            topic.name.to_owned(),
             OmakaseTopic {
                 source: OmakaseSource::Url(get_mirror_url()?),
                 tag: Some("topic".to_string()),
@@ -220,7 +220,6 @@ fn make_omakase_config(omakase_topics: HashMap<String, OmakaseTopic>) -> Result<
                 continue;
             }
         }
-
         result.insert(repo_name, repo);
     }
     result = result.into_iter().chain(omakase_topics).collect();
