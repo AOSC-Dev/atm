@@ -260,10 +260,10 @@ fn commit_changes(siv: &mut Cursive) {
     siv.call_on_name(
         "topic",
         |v: &mut TableView<network::TopicManifest, TopicColumn>| {
-            let items = v.borrow_items();
+            let items = v.borrow_items().to_owned();
             let mut enabled = Vec::new();
             let mut lookup = HashSet::new();
-            for item in items {
+            for item in items.iter() {
                 if item.enabled {
                     enabled.push(item);
                     lookup.insert(item.name.clone());
