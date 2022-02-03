@@ -18,7 +18,7 @@ tempfile = "3.2"
 sha2 = "0.9"
 # tui
 cursive = { version = "0.16", features = ["crossterm-backend"], default-features = false }
-cursive_table_view = { git = "https://github.com/BonsaiDen/cursive_table_view" }
+cursive_table_view = { git = "https://github.com/BonsaiDen/cursive_table_view", rev = "55eca64ef0e9bbcd75970d98f12b023bb635c522" }
 cursive-async-view = "0.5"
 indexmap = { version ="^1", features = ["serde-1"] }
 # cli
@@ -33,7 +33,7 @@ rust-embed = "^6"
 unic-langid = "0.9"
 
 [build-dependencies]
-dbus-codegen = "0.9"
+dbus-codegen = "0.10"
 
 [profile.release]
 lto = true
