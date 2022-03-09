@@ -15,11 +15,11 @@ reqwest = { version = "0.11", features = ["json", "blocking"] }
 nom = "^7"
 nix = "0.23"
 tempfile = "3.2"
-sha2 = "0.9"
+sha2 = "0.10"
 # tui
-cursive = { version = "0.16", features = ["crossterm-backend"], default-features = false }
-cursive_table_view = { git = "https://github.com/BonsaiDen/cursive_table_view", rev = "55eca64ef0e9bbcd75970d98f12b023bb635c522" }
-cursive-async-view = "0.5"
+cursive = { version = "0.17", features = ["crossterm-backend"], default-features = false }
+cursive_table_view = "0.14"
+cursive-async-view = "0.6"
 indexmap = { version ="^1", features = ["serde-1"] }
 # cli
 argh = "0.1"
