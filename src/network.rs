@@ -27,6 +27,7 @@ pub(crate) fn get_arch_name() -> Option<&'static str> {
         "aarch64" => Some("arm64"),
         "powerpc64" => Some("ppc64el"),
         "mips64" => Some("loongson3"),
+        "riscv64" => Some("riscv64"),
         _ => None,
     }
 }
