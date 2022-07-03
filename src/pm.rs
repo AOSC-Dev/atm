@@ -11,7 +11,6 @@ use anyhow::Result;
 use dbus::blocking::{Connection, Proxy};
 use indexmap::IndexMap;
 use lazy_static::lazy_static;
-use reqwest::blocking::get;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_slice, to_string};
 
@@ -22,6 +21,11 @@ const STATE_DIR: &str = "/var/lib/atm/";
 const DPKG_STATE: &str = "/var/lib/dpkg/status";
 const APT_GEN_LIST_STATUS: &str = "/var/lib/apt/gen/status.json";
 const DEFAULT_REPO_URL: &str = "https://repo.aosc.io";
+static APP_USER_AGENT: &str = concat!(
+    env!("CARGO_PKG_NAME"),
+    "/",
+    env!("CARGO_PKG_VERSION"),
+);
 
 #[derive(Deserialize, Debug)]
 struct AptGenListStatus {
@@ -44,7 +48,15 @@ pub fn get_mirror_url() -> Result<String> {
             format!("{}/", url)
         };
 
-        if get(&url).is_ok() {
+        if reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .user_agent(APP_USER_AGENT)
+            .build()?
+            .get(&url)
+            .send()?
+            .error_for_status()
+            .is_ok()
+        {
             return Ok(url);
         }
     }
