@@ -11,6 +11,7 @@ use anyhow::Result;
 use dbus::blocking::{Connection, Proxy};
 use indexmap::IndexMap;
 use lazy_static::lazy_static;
+use reqwest::blocking::get;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_slice, to_string};
 
@@ -35,13 +36,17 @@ struct Mirror {
 pub fn get_mirror_url() -> Result<String> {
     let status_data = fs::read(APT_GEN_LIST_STATUS)?;
     let status_data: AptGenListStatus = serde_json::from_slice(&status_data)?;
-    if let Some((_, url)) = status_data.mirror.first() {
+
+    for (_, url) in status_data.mirror {
         let url = if url.ends_with('/') {
             url.clone()
         } else {
             format!("{}/", url)
         };
-        return Ok(url);
+
+        if get(&url).is_ok() {
+            return Ok(url);
+        }
     }
 
     Ok(DEFAULT_REPO_URL.to_string())
