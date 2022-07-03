@@ -21,6 +21,11 @@ const STATE_DIR: &str = "/var/lib/atm/";
 const DPKG_STATE: &str = "/var/lib/dpkg/status";
 const APT_GEN_LIST_STATUS: &str = "/var/lib/apt/gen/status.json";
 const DEFAULT_REPO_URL: &str = "https://repo.aosc.io";
+static APP_USER_AGENT: &str = concat!(
+    env!("CARGO_PKG_NAME"),
+    "/",
+    env!("CARGO_PKG_VERSION"),
+);
 
 #[derive(Deserialize, Debug)]
 struct AptGenListStatus {
@@ -35,13 +40,25 @@ struct Mirror {
 pub fn get_mirror_url() -> Result<String> {
     let status_data = fs::read(APT_GEN_LIST_STATUS)?;
     let status_data: AptGenListStatus = serde_json::from_slice(&status_data)?;
-    if let Some((_, url)) = status_data.mirror.first() {
+
+    for (_, url) in status_data.mirror {
         let url = if url.ends_with('/') {
             url.clone()
         } else {
             format!("{}/", url)
         };
-        return Ok(url);
+
+        if reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .user_agent(APP_USER_AGENT)
+            .build()?
+            .get(&url)
+            .send()?
+            .error_for_status()
+            .is_ok()
+        {
+            return Ok(url);
+        }
     }
 
     Ok(DEFAULT_REPO_URL.to_string())
