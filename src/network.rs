@@ -1,7 +1,7 @@
 use std::{collections::HashSet, env::consts::ARCH};
 
 use anyhow::{anyhow, Result};
-use reqwest::blocking::Client;
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -20,7 +20,7 @@ pub struct TopicManifest {
 pub(crate) type TopicManifests = Vec<TopicManifest>;
 
 #[inline]
-pub(crate) fn get_arch_name() -> Option<&'static str> {
+pub(crate) const fn get_arch_name() -> Option<&'static str> {
     match ARCH {
         "x86_64" => Some("amd64"),
         "x86" => Some("i486"),
@@ -32,9 +32,9 @@ pub(crate) fn get_arch_name() -> Option<&'static str> {
     }
 }
 
-pub fn fetch_topics(url: &str) -> Result<TopicManifests> {
-    let resp = Client::new().get(url).send()?;
-    let topics: TopicManifests = resp.json()?;
+pub async fn fetch_topics(url: &str) -> Result<TopicManifests> {
+    let resp = Client::new().get(url).send().await?;
+    let topics: TopicManifests = resp.json().await?;
 
     Ok(topics)
 }
