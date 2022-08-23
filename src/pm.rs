@@ -1,14 +1,17 @@
 use std::{
     collections::{HashMap, HashSet},
+    fmt::Write as WriteFmt,
     fs,
     io::Write,
 };
 
 use crate::network::{TopicManifest, TopicManifests};
 use crate::parser::list_installed;
-use crate::pk::{create_transaction, find_stable_version_of, get_updated_packages, refresh_cache};
+use crate::pk::{
+    create_transaction, find_stable_version_of, get_updated_packages, refresh_cache,
+    PackageKitProxy,
+};
 use anyhow::Result;
-use dbus::blocking::{Connection, Proxy};
 use indexmap::IndexMap;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -33,8 +36,8 @@ struct Mirror {
 }
 
 pub fn get_mirror_url() -> Result<String> {
-    let status_data = fs::read(APT_GEN_LIST_STATUS)?;
-    let status_data: AptGenListStatus = serde_json::from_slice(&status_data)?;
+    let status_data: AptGenListStatus =
+        serde_json::from_reader(fs::File::open(APT_GEN_LIST_STATUS)?)?;
     if let Some((_, url)) = status_data.mirror.first() {
         let url = if url.ends_with('/') {
             url.clone()
@@ -139,16 +142,19 @@ fn save_as_previous_topics(current: &[&TopicManifest]) -> Result<String> {
 }
 
 fn make_topic_list(topics: &[&TopicManifest]) -> String {
-    let mut output = String::new();
-    output.reserve(1024);
+    let mut output = String::with_capacity(1024);
 
     for topic in topics {
-        output.push_str(&format!(
-            "# Topic `{}`\ndeb {} {} main\n",
+        writeln!(
+            &mut output,
+            "# Topic `{}`\ndeb {}debs {} main",
             topic.name,
-            format!("{}{}", MIRROR_URL.to_string(), "debs"),
+            MIRROR_URL.to_string(),
             topic.name
-        ));
+        )
+        .unwrap();
+        // this will only happen when malloc() fails.
+        // in which case, it's better to just panic
     }
 
     output
@@ -166,18 +172,18 @@ pub fn write_source_list(topics: &[&TopicManifest]) -> Result<()> {
     Ok(())
 }
 
-pub fn switch_topics(
-    proxy: &Proxy<&Connection>,
+pub async fn switch_topics(
+    proxy: &PackageKitProxy<'_>,
     closed: &[TopicManifest],
 ) -> Result<(Vec<String>, Vec<String>)> {
-    let tx_proxy = create_transaction(&proxy)?;
-    refresh_cache(&tx_proxy)?;
+    let tx_proxy = create_transaction(&proxy).await?;
+    refresh_cache(&tx_proxy).await?;
     let removed = close_topics(closed)?;
     let removed = removed.iter().map(|x| x.as_str()).collect::<Vec<_>>();
-    let tx_proxy = create_transaction(&proxy)?;
-    let (not_found, tasks) = find_stable_version_of(&tx_proxy, &removed)?;
-    let tx_proxy = create_transaction(&proxy)?;
-    let updated = get_updated_packages(&tx_proxy)?;
+    let tx_proxy = create_transaction(&proxy).await?;
+    let (not_found, tasks) = find_stable_version_of(&tx_proxy, &removed).await?;
+    let tx_proxy = create_transaction(&proxy).await?;
+    let updated = get_updated_packages(&tx_proxy).await?;
     let mut updated = updated
         .into_iter()
         .map(|x| x.package_id)

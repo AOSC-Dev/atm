@@ -23,7 +23,7 @@ no_stable_version = {$count ->
     *[other] Notice: {$count} packages could not be downgraded to their stable versions.
 }
 install_count = {$count ->
-    [one] one package will be installed
+    [one] One package will be installed
     *[other] {$count} packages will be installed
 }
 erase_count = {$count ->
