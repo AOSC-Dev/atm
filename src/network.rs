@@ -20,7 +20,7 @@ pub struct TopicManifest {
 pub(crate) type TopicManifests = Vec<TopicManifest>;
 
 #[inline]
-pub(crate) const fn get_arch_name() -> Option<&'static str> {
+pub(crate) fn get_arch_name() -> Option<&'static str> {
     match ARCH {
         "x86_64" => Some("amd64"),
         "x86" => Some("i486"),

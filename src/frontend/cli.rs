@@ -114,12 +114,13 @@ pub fn privileged_write_source_list(topics: &[&network::TopicManifest]) -> Resul
     Ok(())
 }
 
-fn fetch_available_topics() -> Result<network::TopicManifests> {
+async fn fetch_available_topics() -> Result<network::TopicManifests> {
     let topics = network::fetch_topics(&format!(
         "{}{}",
         pm::MIRROR_URL.to_string(),
         "debs/manifest/topics.json"
-    ))?;
+    ))
+    .await?;
 
     network::filter_topics(topics)
 }
@@ -150,15 +151,16 @@ fn format_manifests(topics: network::TopicManifests) {
     formatter.flush().unwrap();
 }
 
-fn list_topics() {
+async fn list_topics() {
     let mut fallback = false;
-    eprintln!("{}", fl!("refresh_manifest"));
-    let available = fetch_available_topics().unwrap_or_else(|_| {
+    eprint!("{}", fl!("refresh_manifest"));
+    let available = fetch_available_topics().await.unwrap_or_else(|_| {
         fallback = true;
         Vec::new()
     });
     let mut topics = pm::get_display_listing(available);
-    topics.sort_unstable_by_key(|t| !t.enabled);
+    topics.sort_unstable_by_key(|t| t.date + if t.enabled { 1_000_000_000 } else { 0 });
+    eprint!("\r\t\t\r"); // clear display
     format_manifests(topics);
     if fallback {
         eprintln!("{}", fl!("fetch-error-fallback"));
@@ -199,15 +201,18 @@ fn refresh_topics<P: AsRef<Path>>(filename: Option<P>, chksum: &Option<String>) 
     Ok(())
 }
 
-fn add_topics(topics_to_add: &[String]) -> Result<()> {
+async fn add_topics(topics_to_add: &[String]) -> Result<()> {
     needs_root()?;
     eprintln!("{}", fl!("refresh_manifest"));
-    let available = fetch_available_topics()?;
+    let available = fetch_available_topics().await?;
     let mut topics = pm::get_display_listing(available);
     for topic in topics.iter_mut() {
-        topic.enabled = topics_to_add.contains(&topic.name);
+        topic.enabled |= topics_to_add.contains(&topic.name);
     }
-    let topics_ref = topics.iter().map(|t| t).collect::<Vec<_>>();
+    let topics_ref = topics
+        .iter()
+        .filter_map(|t| if t.enabled { Some(t) } else { None })
+        .collect::<Vec<_>>();
     pm::write_source_list(&topics_ref)?;
     println!("{}", fl!("apt_finished"));
 
@@ -235,8 +240,12 @@ pub fn cli_main() -> bool {
         return false;
     }
     let commands = args.command.unwrap();
+    let runner = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("failed to initialize async runtime");
     match commands {
-        ATMCommand::List(_) => list_topics(),
+        ATMCommand::List(_) => runner.block_on(list_topics()),
         ATMCommand::Refresh(args) => {
             if let Err(e) = refresh_topics(args.filename, &args.checksum) {
                 eprintln!("{}", e);
@@ -244,7 +253,7 @@ pub fn cli_main() -> bool {
             }
         }
         ATMCommand::Add(topics) => {
-            if let Err(e) = add_topics(&topics.name) {
+            if let Err(e) = runner.block_on(add_topics(&topics.name)) {
                 eprintln!("{}", e);
                 process::exit(1);
             }
