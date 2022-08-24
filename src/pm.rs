@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     collections::{HashMap, HashSet},
     fmt::Write as WriteFmt,
     fs,
@@ -107,6 +108,16 @@ fn save_as_previous_topics(current: &[&TopicManifest]) -> Result<String> {
     Ok(to_string(&previous_topics)?)
 }
 
+fn normalize_url(url: &str) -> Cow<str> {
+    if url.ends_with('/') {
+        Cow::Borrowed(url)
+    } else {
+        let mut url = Cow::from(url);
+        url.to_mut().push('/');
+        url
+    }
+}
+
 fn make_topic_list(topics: &[&TopicManifest], mirror_url: &str) -> String {
     let mut output = String::with_capacity(1024);
 
@@ -115,7 +126,7 @@ fn make_topic_list(topics: &[&TopicManifest], mirror_url: &str) -> String {
             &mut output,
             "# Topic `{}`\ndeb {}debs {} main",
             topic.name,
-            mirror_url,
+            normalize_url(mirror_url),
             topic.name
         )
         .unwrap();
