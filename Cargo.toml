@@ -26,7 +26,8 @@ argh = "0.1"
 tabwriter = "^1"
 # packagekit related
 zbus = "^3"
-tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "fs"] }
+futures = "0.3"
 # i18n
 i18n-embed = { version = "0.13", features = ["fluent-system", "desktop-requester"]}
 i18n-embed-fl = "0.6"

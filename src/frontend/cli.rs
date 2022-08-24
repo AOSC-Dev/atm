@@ -35,6 +35,9 @@ pub(crate) struct RefreshList {
     /// checksum of the topic list file (optional)
     #[argh(option, short = 'c')]
     pub checksum: Option<String>,
+    /// mirror URL to use for the topic list file (optional)
+    #[argh(option, short = 'm')]
+    pub mirror: Option<String>,
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -72,7 +75,10 @@ fn needs_root() -> Result<()> {
 }
 
 /// Escalate permissions using Polkit-1 and write configuration file
-pub fn privileged_write_source_list(topics: &[&network::TopicManifest]) -> Result<()> {
+pub fn privileged_write_source_list(
+    topics: &[&network::TopicManifest],
+    mirror_url: &str,
+) -> Result<()> {
     use nix::unistd::geteuid;
     use std::io::Write;
     use std::process::{Command, Stdio};
@@ -80,7 +86,7 @@ pub fn privileged_write_source_list(topics: &[&network::TopicManifest]) -> Resul
 
     if geteuid().is_root() {
         // already root
-        return pm::write_source_list(topics);
+        return pm::write_source_list(topics, mirror_url);
     }
     if std::env::var("DISPLAY").is_err() {
         return Err(anyhow!(fl!("headless-sudo-unsupported")));
@@ -97,7 +103,7 @@ pub fn privileged_write_source_list(topics: &[&network::TopicManifest]) -> Resul
     // pass the temporary file to the privileged process
     let cmd = Command::new("pkexec")
         .arg(my_name)
-        .args(&["refresh", "-c", chksum.as_str(), "-f"])
+        .args(&["refresh", "-c", chksum.as_str(), "-m", mirror_url, "-f"])
         .arg(f.path())
         .stderr(Stdio::piped())
         .spawn()
@@ -115,12 +121,9 @@ pub fn privileged_write_source_list(topics: &[&network::TopicManifest]) -> Resul
 }
 
 async fn fetch_available_topics() -> Result<network::TopicManifests> {
-    let topics = network::fetch_topics(&format!(
-        "{}{}",
-        pm::MIRROR_URL.to_string(),
-        "debs/manifest/topics.json"
-    ))
-    .await?;
+    let client = network::create_http_client()?;
+    let mirror_url = network::get_best_mirror_url(&client).await;
+    let topics = network::fetch_topics(&client, &mirror_url).await?;
 
     network::filter_topics(topics)
 }
@@ -141,7 +144,7 @@ fn format_manifests(topics: network::TopicManifests) {
         write!(
             &mut formatter,
             "{} {}\t{}\t{}\n",
-            if topic.enabled { "*" } else { " " },
+            if topic.enabled { '*' } else { ' ' },
             topic.name,
             format_timestamp(topic.date).unwrap_or_else(|_| "?".to_string()),
             topic.description.unwrap_or_default()
@@ -169,7 +172,11 @@ async fn list_topics() {
     }
 }
 
-fn refresh_topics<P: AsRef<Path>>(filename: Option<P>, chksum: &Option<String>) -> Result<()> {
+fn refresh_topics<P: AsRef<Path>>(
+    filename: Option<P>,
+    chksum: &Option<String>,
+    mirror_url: Option<String>,
+) -> Result<()> {
     needs_root()?;
     let topics = match filename {
         Some(filename) => {
@@ -195,7 +202,8 @@ fn refresh_topics<P: AsRef<Path>>(filename: Option<P>, chksum: &Option<String>) 
         }
     };
     let topics_ref = topics.iter().map(|t| t).collect::<Vec<_>>();
-    pm::write_source_list(&topics_ref)?;
+    let mirror_url = mirror_url.unwrap_or_else(|| network::get_sensible_mirror_url());
+    pm::write_source_list(&topics_ref, &mirror_url)?;
     println!("{}", fl!("apt_finished"));
 
     Ok(())
@@ -204,6 +212,8 @@ fn refresh_topics<P: AsRef<Path>>(filename: Option<P>, chksum: &Option<String>) 
 async fn add_topics(topics_to_add: &[String]) -> Result<()> {
     needs_root()?;
     eprintln!("{}", fl!("refresh_manifest"));
+    let client = network::create_http_client()?;
+    let mirror_url = network::get_best_mirror_url(&client).await;
     let available = fetch_available_topics().await?;
     let mut topics = pm::get_display_listing(available);
     for topic in topics.iter_mut() {
@@ -213,7 +223,7 @@ async fn add_topics(topics_to_add: &[String]) -> Result<()> {
         .iter()
         .filter_map(|t| if t.enabled { Some(t) } else { None })
         .collect::<Vec<_>>();
-    pm::write_source_list(&topics_ref)?;
+    pm::write_source_list(&topics_ref, &mirror_url)?;
     println!("{}", fl!("apt_finished"));
 
     Ok(())
@@ -226,7 +236,7 @@ fn remove_topics(topics_to_remove: &[String]) -> Result<()> {
         .iter_mut()
         .for_each(|t| t.enabled = !topics_to_remove.contains(&t.name));
     let topics_ref = topics.iter().map(|t| t).collect::<Vec<_>>();
-    pm::write_source_list(&topics_ref)?;
+    pm::write_source_list(&topics_ref, &network::get_sensible_mirror_url())?;
     println!("{}", fl!("apt_finished"));
 
     Ok(())
@@ -247,7 +257,7 @@ pub fn cli_main() -> bool {
     match commands {
         ATMCommand::List(_) => runner.block_on(list_topics()),
         ATMCommand::Refresh(args) => {
-            if let Err(e) = refresh_topics(args.filename, &args.checksum) {
+            if let Err(e) = refresh_topics(args.filename, &args.checksum, args.mirror) {
                 eprintln!("{}", e);
                 process::exit(1);
             }

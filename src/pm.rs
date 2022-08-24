@@ -12,8 +12,6 @@ use crate::pk::{
     PackageKitProxy,
 };
 use anyhow::Result;
-use indexmap::IndexMap;
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_reader, to_string};
 
@@ -24,36 +22,6 @@ const STATE_DIR: &str = "/var/lib/atm/";
 const DPKG_STATE: &str = "/var/lib/dpkg/status";
 const APT_GEN_LIST_STATUS: &str = "/var/lib/apt/gen/status.json";
 const DEFAULT_REPO_URL: &str = "https://repo.aosc.io";
-
-#[derive(Deserialize, Debug)]
-struct AptGenListStatus {
-    mirror: IndexMap<String, String>,
-}
-
-#[derive(Deserialize, Debug)]
-struct Mirror {
-    url: String,
-}
-
-pub fn get_mirror_url() -> Result<String> {
-    let status_data: AptGenListStatus =
-        serde_json::from_reader(fs::File::open(APT_GEN_LIST_STATUS)?)?;
-    if let Some((_, url)) = status_data.mirror.first() {
-        let url = if url.ends_with('/') {
-            url.clone()
-        } else {
-            format!("{}/", url)
-        };
-        return Ok(url);
-    }
-
-    Ok(DEFAULT_REPO_URL.to_string())
-}
-
-lazy_static! {
-    pub static ref MIRROR_URL: String =
-        get_mirror_url().unwrap_or_else(|_| "https://repo.aosc.io/".to_string());
-}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PreviousTopic {
@@ -139,7 +107,7 @@ fn save_as_previous_topics(current: &[&TopicManifest]) -> Result<String> {
     Ok(to_string(&previous_topics)?)
 }
 
-fn make_topic_list(topics: &[&TopicManifest]) -> String {
+fn make_topic_list(topics: &[&TopicManifest], mirror_url: &str) -> String {
     let mut output = String::with_capacity(1024);
 
     for topic in topics {
@@ -147,7 +115,7 @@ fn make_topic_list(topics: &[&TopicManifest]) -> String {
             &mut output,
             "# Topic `{}`\ndeb {}debs {} main",
             topic.name,
-            MIRROR_URL.to_string(),
+            mirror_url,
             topic.name
         )
         .unwrap();
@@ -158,10 +126,10 @@ fn make_topic_list(topics: &[&TopicManifest]) -> String {
     output
 }
 
-pub fn write_source_list(topics: &[&TopicManifest]) -> Result<()> {
+pub fn write_source_list(topics: &[&TopicManifest], mirror_url: &str) -> Result<()> {
     let mut f = fs::File::create(SOURCE_PATH)?;
     f.write_all(SOURCE_HEADER)?;
-    f.write_all(make_topic_list(topics).as_bytes())?;
+    f.write_all(make_topic_list(topics, mirror_url).as_bytes())?;
 
     fs::create_dir_all(STATE_DIR)?;
     let mut f = fs::File::create(STATE_PATH)?;
