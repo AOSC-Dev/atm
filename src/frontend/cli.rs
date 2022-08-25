@@ -156,7 +156,7 @@ fn format_manifests(topics: network::TopicManifests) {
 
 async fn list_topics() {
     let mut fallback = false;
-    eprint!("{}", fl!("refresh_manifest"));
+    eprint!("{}", fl!("refresh-manifest"));
     let available = fetch_available_topics().await.unwrap_or_else(|_| {
         fallback = true;
         Vec::new()
@@ -211,7 +211,7 @@ fn refresh_topics<P: AsRef<Path>>(
 
 async fn add_topics(topics_to_add: &[String]) -> Result<()> {
     needs_root()?;
-    eprintln!("{}", fl!("refresh_manifest"));
+    eprintln!("{}", fl!("refresh-manifest"));
     let client = network::create_http_client()?;
     let mirror_url = network::get_best_mirror_url(&client).await;
     let available = fetch_available_topics().await?;

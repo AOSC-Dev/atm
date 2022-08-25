@@ -56,21 +56,21 @@ impl Type for PkError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct PkPackgeId<'a> {
-    name: &'a str,
-    version: &'a str,
+    pub name: &'a str,
+    pub version: &'a str,
     arch: &'a str,
     data: &'a str,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct PkTaskList<'a> {
-    hold: Vec<PkPackgeId<'a>>,
-    upgrade: Vec<PkPackgeId<'a>>,
-    install: Vec<PkPackgeId<'a>>,
-    downgrade: Vec<PkPackgeId<'a>>,
-    erase: Vec<PkPackgeId<'a>>,
+    pub hold: Vec<PkPackgeId<'a>>,
+    pub upgrade: Vec<PkPackgeId<'a>>,
+    pub install: Vec<PkPackgeId<'a>>,
+    pub downgrade: Vec<PkPackgeId<'a>>,
+    pub erase: Vec<PkPackgeId<'a>>,
 }
 
 #[dbus_proxy(
@@ -330,17 +330,15 @@ pub async fn execute_transaction(
         return Ok(());
     }
     // start transaction
-    proxy
-        .install_packages(
-            (PK_TRANSACTION_FLAG_ENUM_ALLOW_REINSTALL | PK_TRANSACTION_FLAG_ENUM_ALLOW_DOWNGRADE)
-                as u64,
-            package_ids,
-        )
-        .await?;
+    let fut = proxy.install_packages(
+        (PK_TRANSACTION_FLAG_ENUM_ALLOW_REINSTALL | PK_TRANSACTION_FLAG_ENUM_ALLOW_DOWNGRADE)
+            as u64,
+        package_ids,
+    );
 
     // start all the monitoring facilities
     tokio::select! {
-        v = monitor_item_progress(proxy, &progress_tx) => v,
+        v = monitor_item_progress(proxy, &progress_tx, fut) => v,
         v = async {
             // handle overall transaction progress
             let mut stream = proxy.receive_percentage_changed().await;
@@ -363,11 +361,13 @@ pub async fn execute_transaction(
     }
 }
 
-async fn monitor_item_progress(
+async fn monitor_item_progress<Fut: Future<Output = zResult<()>>>(
     proxy: &TransactionProxy<'_>,
     progress_tx: &Sender<PkDisplayProgress>,
+    fut: Fut,
 ) -> Result<()> {
     let mut signal_stream = proxy.receive_all_signals().await?;
+    fut.await?;
     while let Some(signal) = signal_stream.next().await {
         let name = signal.member();
         if let Some(name) = name {
@@ -419,7 +419,7 @@ pub fn get_task_details<'a>(
 
     for m in meta {
         let parsed =
-            parse_package_id(&m.package_id).ok_or_else(|| anyhow!("Invalid package id"))?;
+            parse_package_id(&m.package_id).ok_or_else(|| anyhow!("({})", m.package_id))?;
         match m.info as u8 {
             PK_INFO_ENUM_INSTALLING | PK_INFO_ENUM_REINSTALLING => output.install.push(parsed),
             PK_INFO_ENUM_UPDATING => output.upgrade.push(parsed),

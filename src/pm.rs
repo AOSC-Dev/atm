@@ -21,8 +21,6 @@ const SOURCE_PATH: &str = "/etc/apt/sources.list.d/atm.list";
 const STATE_PATH: &str = "/var/lib/atm/state";
 const STATE_DIR: &str = "/var/lib/atm/";
 const DPKG_STATE: &str = "/var/lib/dpkg/status";
-const APT_GEN_LIST_STATUS: &str = "/var/lib/apt/gen/status.json";
-const DEFAULT_REPO_URL: &str = "https://repo.aosc.io";
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PreviousTopic {
