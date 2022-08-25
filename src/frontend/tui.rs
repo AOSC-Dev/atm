@@ -249,6 +249,9 @@ fn commit_transactions(siv: &mut Cursive, packages: &[PkPackage]) {
         })
     });
     thread::spawn(move || {
+        // tracker
+        let mut tracker = crate::desktop::select_best_tracker();
+        tracker.set_general_description(&fl!("info-title"));
         loop {
             if let Ok(progress) = progress_rx.recv() {
                 match progress {
@@ -257,19 +260,23 @@ fn commit_transactions(siv: &mut Cursive, packages: &[PkPackage]) {
                         let status_message = match status {
                             pk::PK_STATUS_ENUM_DOWNLOAD => fl!("exe_download", name = name),
                             pk::PK_STATUS_ENUM_INSTALL => fl!("exe-install", name = name),
+                            pk::PK_STATUS_ENUM_SETUP => fl!("exe-setup", name = name),
                             _ => fl!("exe-install", name = name),
                         };
                         item_counter.set(pct as usize);
+                        tracker.set_message(&fl!("info-status"), &status_message);
                         status_text.set_content(status_message);
                     }
                     pk::PkDisplayProgress::Overall(pct) => {
                         if pct < 101 {
+                            tracker.set_percent(pct);
                             overall_counter.set(pct as usize);
                         }
                     }
                     pk::PkDisplayProgress::Done => break,
                 }
             } else {
+                tracker.terminate("");
                 break;
             }
         }
@@ -353,6 +360,9 @@ fn calculate_changes(siv: &mut Cursive, reinstall: TopicManifests) {
         siv,
         move || {
             let runner = create_async_runner().map_err(|e| e.to_string())?;
+            let mut tracker = crate::desktop::select_best_tracker();
+            tracker.set_general_description(&fl!("refresh-apt"));
+
             runner.block_on(async {
                 let proxy = pk::connect_packagekit(&dbus_connection)
                     .await

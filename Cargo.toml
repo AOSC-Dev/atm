@@ -1,6 +1,6 @@
 [package]
 name = "atm"
-version = "0.5.5-alpha.0"
+version = "0.6.0-alpha.0"
 authors = ["liushuyu <liushuyu011@gmail.com>"]
 edition = "2018"
 
@@ -26,7 +26,7 @@ argh = "0.1"
 tabwriter = "^1"
 # packagekit related
 zbus = "^3"
-tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "fs"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "fs", "process"] }
 futures = "0.3"
 # i18n
 i18n-embed = { version = "0.13", features = ["fluent-system", "desktop-requester"]}

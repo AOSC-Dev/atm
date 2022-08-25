@@ -12,7 +12,10 @@
 
 use zbus::dbus_proxy;
 
-#[dbus_proxy(interface = "org.freedesktop.PackageKit.Transaction")]
+#[dbus_proxy(
+    interface = "org.freedesktop.PackageKit.Transaction",
+    default_service = "org.freedesktop.PackageKit"
+)]
 trait Transaction {
     /// AcceptEula method
     fn accept_eula(&self, eula_id: &str) -> zbus::Result<()>;

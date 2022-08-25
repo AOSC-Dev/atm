@@ -110,7 +110,7 @@ const PK_TRANSACTION_FLAG_ENUM_ALLOW_DOWNGRADE: u32 = 1 << 6;
 // PackageKit informational constants (literal values)
 const PK_NETWORK_ENUM_MOBILE: u8 = 5;
 // PackageKit status constants
-pub const PK_STATUS_ENUM_WAIT: u8 = 1;
+// pub const PK_STATUS_ENUM_WAIT: u8 = 1;
 pub const PK_STATUS_ENUM_SETUP: u8 = 2;
 pub const PK_STATUS_ENUM_DOWNLOAD: u8 = 8;
 pub const PK_STATUS_ENUM_INSTALL: u8 = 9;
