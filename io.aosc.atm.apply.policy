@@ -4,7 +4,7 @@
 <policyconfig>
 
   <vendor>Anthon Open Source Community</vendor>
-  <vendor_url>https://github.com/mesonbuild/meson</vendor_url>
+  <vendor_url>https://github.com/AOSC-Dev/atm</vendor_url>
 
   <action id="io.aosc.atm.apply.run">
     <description>Apply ATM configurations</description>
