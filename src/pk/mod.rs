@@ -6,12 +6,13 @@ mod packagekit_tx;
 use std::{collections::HashMap, future::Future, sync::mpsc::Sender, time::Duration};
 
 use anyhow::{anyhow, Result};
+use futures::StreamExt;
 pub use packagekit::PackageKitProxy;
 use packagekit_tx::TransactionProxy;
 use serde::Deserialize;
 use zbus::{
     dbus_proxy,
-    export::futures_util::StreamExt,
+    export::ordered_stream::OrderedStreamExt,
     zvariant::{Signature, Type},
     Connection, Result as zResult,
 };
@@ -162,7 +163,7 @@ async fn wait_for_exit_signal<Fut: Future<Output = zResult<()>>>(
     let mut signal_stream = proxy.receive_all_signals().await?;
     // poll the future to start the transaction
     func.await?;
-    while let Some(signal) = signal_stream.next().await {
+    while let Some(signal) = OrderedStreamExt::next(&mut signal_stream).await {
         let name = signal.member();
         if let Some(name) = name {
             match name.as_str() {
@@ -187,7 +188,7 @@ async fn collect_packages<Fut: Future<Output = zResult<()>>>(
     let mut signal_stream = proxy.receive_all_signals().await?;
     // poll the future to start the transaction
     func.await?;
-    while let Some(signal) = signal_stream.next().await {
+    while let Some(signal) = OrderedStreamExt::next(&mut signal_stream).await {
         let name = signal.member();
         if let Some(name) = name {
             match name.as_str() {
@@ -381,7 +382,7 @@ async fn monitor_item_progress<Fut: Future<Output = zResult<()>>>(
 ) -> Result<()> {
     let mut signal_stream = proxy.receive_all_signals().await?;
     fut.await?;
-    while let Some(signal) = signal_stream.next().await {
+    while let Some(signal) = OrderedStreamExt::next(&mut signal_stream).await {
         let name = signal.member();
         if let Some(name) = name {
             match name.as_str() {
