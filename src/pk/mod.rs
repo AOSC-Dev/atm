@@ -384,7 +384,7 @@ async fn monitor_item_progress<Fut: Future<Output = zResult<()>>>(
         if let Some(name) = name {
             match name.as_str() {
                 // handle individual transaction item (single package progress)
-                "Progress" => {
+                "ItemProgress" => {
                     let item: PkProgress = signal.body()?;
                     progress_tx.send(PkDisplayProgress::Package(
                         item.id,
