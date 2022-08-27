@@ -104,6 +104,7 @@ trait Login1 {
 const PK_FILTER_ENUM_NEWEST: u32 = 1 << 16;
 const PK_FILTER_ENUM_ARCH: u32 = 1 << 18;
 const PK_FILTER_ENUM_NOT_SOURCE: u32 = 1 << 21;
+const PK_TRANSACTION_FLAG_ENUM_ONLY_TRUSTED: u32 = 1 << 1;
 const PK_TRANSACTION_FLAG_ENUM_SIMULATE: u32 = 1 << 2;
 const PK_TRANSACTION_FLAG_ENUM_ALLOW_REINSTALL: u32 = 1 << 4;
 const PK_TRANSACTION_FLAG_ENUM_ALLOW_DOWNGRADE: u32 = 1 << 6;
@@ -340,7 +341,8 @@ pub async fn execute_transaction(
         send_packagekit_hints(proxy).await?;
         proxy
             .update_packages(
-                (PK_TRANSACTION_FLAG_ENUM_ALLOW_REINSTALL
+                (PK_TRANSACTION_FLAG_ENUM_ONLY_TRUSTED
+                    | PK_TRANSACTION_FLAG_ENUM_ALLOW_REINSTALL
                     | PK_TRANSACTION_FLAG_ENUM_ALLOW_DOWNGRADE) as u64,
                 package_ids,
             )
