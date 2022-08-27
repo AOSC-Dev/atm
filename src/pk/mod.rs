@@ -319,6 +319,12 @@ pub async fn get_transaction_steps(
     .await
 }
 
+async fn send_packagekit_hints(proxy: &TransactionProxy<'_>) -> zResult<()> {
+    proxy
+        .set_hints(&["background=false", "interactive=true"])
+        .await
+}
+
 /// Execute a transaction with progress monitoring
 pub async fn execute_transaction(
     proxy: &TransactionProxy<'_>,
@@ -330,11 +336,16 @@ pub async fn execute_transaction(
         return Ok(());
     }
     // start transaction
-    let fut = proxy.install_packages(
-        (PK_TRANSACTION_FLAG_ENUM_ALLOW_REINSTALL | PK_TRANSACTION_FLAG_ENUM_ALLOW_DOWNGRADE)
-            as u64,
-        package_ids,
-    );
+    let fut = async {
+        send_packagekit_hints(proxy).await?;
+        proxy
+            .update_packages(
+                (PK_TRANSACTION_FLAG_ENUM_ALLOW_REINSTALL
+                    | PK_TRANSACTION_FLAG_ENUM_ALLOW_DOWNGRADE) as u64,
+                package_ids,
+            )
+            .await
+    };
 
     // start all the monitoring facilities
     tokio::select! {
