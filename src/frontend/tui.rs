@@ -444,6 +444,7 @@ fn build_topic_list_view(siv: &mut Cursive, manifest: Vec<TopicManifest>) {
     let marks = Rc::new(RefCell::new(map));
     let marks_table = Rc::clone(&marks);
     let has_closed = manifest.iter().any(|x| x.closed);
+    let table_height = siv.screen_size().y.checked_sub(14).unwrap_or(4);
 
     let view = TableView::<network::TopicManifest, TopicColumn>::new()
         .column(TopicColumn::Enabled, "", |c| {
@@ -477,7 +478,7 @@ fn build_topic_list_view(siv: &mut Cursive, manifest: Vec<TopicManifest>) {
         })
         .with_name("topic")
         .min_width(106)
-        .min_height(25)
+        .min_height(table_height)
         .scrollable();
 
     let mut top_view = LinearLayout::vertical();
