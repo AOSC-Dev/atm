@@ -211,7 +211,7 @@ pub async fn create_dbus_connection() -> zResult<Connection> {
 }
 
 /// Connect to the packagekit backend
-pub async fn connect_packagekit(conn: &Connection) -> zResult<PackageKitProxy> {
+pub async fn connect_packagekit(conn: &Connection) -> zResult<PackageKitProxy<'_>> {
     PackageKitProxy::new(conn).await
 }
 
