@@ -151,13 +151,13 @@ pub async fn switch_topics(
     proxy: &PackageKitProxy<'_>,
     closed: &[TopicManifest],
 ) -> Result<(Vec<String>, Vec<String>)> {
-    let tx_proxy = create_transaction(&proxy).await?;
+    let tx_proxy = create_transaction(proxy).await?;
     refresh_cache(&tx_proxy).await?;
     let removed = close_topics(closed)?;
     let removed = removed.iter().map(|x| x.as_str()).collect::<Vec<_>>();
-    let tx_proxy = create_transaction(&proxy).await?;
+    let tx_proxy = create_transaction(proxy).await?;
     let (not_found, tasks) = find_stable_version_of(&tx_proxy, &removed).await?;
-    let tx_proxy = create_transaction(&proxy).await?;
+    let tx_proxy = create_transaction(proxy).await?;
     let updated = get_updated_packages(&tx_proxy).await?;
     let mut updated = updated
         .into_iter()

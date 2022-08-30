@@ -145,7 +145,7 @@ pub fn humanize_package_id(package_id: &str) -> String {
     }
 }
 
-fn parse_package_id<'a>(package_id: &'a str) -> Option<PkPackgeId<'a>> {
+fn parse_package_id(package_id: &str) -> Option<PkPackgeId<'_>> {
     let mut splitted = package_id.splitn(4, ';');
 
     Some(PkPackgeId {
@@ -448,7 +448,7 @@ pub fn get_task_details<'a>(
 
 /// Take the wake lock and prevent the system from sleeping. Drop the returned file handle to release the lock.
 pub async fn take_wake_lock(conn: &Connection, why: &str) -> zResult<zbus::zvariant::OwnedFd> {
-    let proxy = Login1Proxy::new(&conn).await?;
+    let proxy = Login1Proxy::new(conn).await?;
 
     proxy.inhibit("shutdown:sleep", "atm", why, "block").await
 }

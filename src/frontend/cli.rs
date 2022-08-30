@@ -132,18 +132,18 @@ fn format_manifests(topics: network::TopicManifests) {
     use std::io::Write;
 
     let mut formatter = tabwriter::TabWriter::new(std::io::stderr());
-    write!(
+    writeln!(
         &mut formatter,
-        "  {}\t{}\t{}\n",
+        "  {}\t{}\t{}",
         fl!("name"),
         fl!("date"),
         fl!("description")
     )
     .unwrap();
     for topic in topics {
-        write!(
+        writeln!(
             &mut formatter,
-            "{} {}\t{}\t{}\n",
+            "{} {}\t{}\t{}",
             if topic.enabled { '*' } else { ' ' },
             topic.name,
             format_timestamp(topic.date).unwrap_or_else(|_| "?".to_string()),
@@ -201,8 +201,8 @@ fn refresh_topics<P: AsRef<Path>>(
             topics
         }
     };
-    let topics_ref = topics.iter().map(|t| t).collect::<Vec<_>>();
-    let mirror_url = mirror_url.unwrap_or_else(|| network::get_sensible_mirror_url());
+    let topics_ref = topics.iter().collect::<Vec<_>>();
+    let mirror_url = mirror_url.unwrap_or_else(network::get_sensible_mirror_url);
     pm::write_source_list(&topics_ref, &mirror_url)?;
     println!("{}", fl!("apt_finished"));
 
@@ -219,10 +219,7 @@ async fn add_topics(topics_to_add: &[String]) -> Result<()> {
     for topic in topics.iter_mut() {
         topic.enabled |= topics_to_add.contains(&topic.name);
     }
-    let topics_ref = topics
-        .iter()
-        .filter_map(|t| if t.enabled { Some(t) } else { None })
-        .collect::<Vec<_>>();
+    let topics_ref = topics.iter().filter(|t| t.enabled).collect::<Vec<_>>();
     pm::write_source_list(&topics_ref, &mirror_url)?;
     println!("{}", fl!("apt_finished"));
 
@@ -235,7 +232,7 @@ fn remove_topics(topics_to_remove: &[String]) -> Result<()> {
     topics
         .iter_mut()
         .for_each(|t| t.enabled = !topics_to_remove.contains(&t.name));
-    let topics_ref = topics.iter().map(|t| t).collect::<Vec<_>>();
+    let topics_ref = topics.iter().collect::<Vec<_>>();
     pm::write_source_list(&topics_ref, &network::get_sensible_mirror_url())?;
     println!("{}", fl!("apt_finished"));
 

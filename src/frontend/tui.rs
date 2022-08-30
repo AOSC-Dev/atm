@@ -131,7 +131,7 @@ fn check_network(siv: &mut Cursive, marks: Rc<RefCell<MarksMap>>) {
             .await
             .unwrap_or(false)
     }) {
-        return check_battery_level(siv, marks.clone());
+        return check_battery_level(siv, marks);
     }
     siv.add_layer(
         Dialog::around(TextView::new(fl!("pk_metered_network")))
@@ -154,7 +154,7 @@ fn check_battery_level(siv: &mut Cursive, marks: Rc<RefCell<MarksMap>>) {
             .await
             .unwrap_or(false)
     }) {
-        return check_changes(siv, marks.clone());
+        return check_changes(siv, marks);
     }
     siv.add_layer(
         Dialog::around(TextView::new(fl!("pk_battery")))
@@ -504,8 +504,8 @@ fn fetch_manifest(siv: &mut Cursive) {
         .async_runner
         .block_on(network::fetch_topics(&ctx.client, &ctx.mirror_url));
     let filtered_list = fetch_result
-        .and_then(|result| network::filter_topics(result))
-        .map(|topics| pm::get_display_listing(topics));
+        .and_then(network::filter_topics)
+        .map(pm::get_display_listing);
     match filtered_list {
         Ok(filtered_list) => build_topic_list_view(siv, filtered_list),
         Err(e) => show_error(siv, &fl!("error-fetch-manifest", error = e.to_string())),
