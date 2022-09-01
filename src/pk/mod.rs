@@ -86,7 +86,7 @@ trait UPower {
 }
 
 #[dbus_proxy(
-    interface = "org.freedesktop.login1",
+    interface = "org.freedesktop.login1.Manager",
     default_service = "org.freedesktop.login1",
     default_path = "/org/freedesktop/login1"
 )]
