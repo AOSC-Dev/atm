@@ -1,33 +1,28 @@
 use anyhow::{anyhow, Result};
-use nom::{
-    bytes::complete::{tag, take_until},
-    character::complete::{char, space0},
-    combinator::{map, verify},
-    multi::many1,
-    sequence::{separated_pair, terminated, tuple},
-    IResult,
-};
 use std::collections::HashSet;
+use winnow::{
+    bytes::{one_of, tag, take_until0},
+    character::space0,
+    multi::many1,
+    sequence::{separated_pair, terminated},
+    IResult, Parser,
+};
 
 #[inline]
 fn key_name(input: &[u8]) -> IResult<&[u8], &[u8]> {
-    verify(take_until(":"), |input: &[u8]| {
-        if !input.is_empty() {
-            input[0] != b'\n'
-        } else {
-            false
-        }
-    })(input)
+    take_until0(":")
+        .verify(|input: &[u8]| !input.is_empty() && input[0] != b'\n')
+        .parse_next(input)
 }
 
 #[inline]
 fn separator(input: &[u8]) -> IResult<&[u8], ()> {
-    map(tuple((char(':'), space0)), |_| ())(input)
+    (one_of(':'), space0).void().parse_next(input)
 }
 
 #[inline]
 fn single_line(input: &[u8]) -> IResult<&[u8], &[u8]> {
-    take_until("\n")(input)
+    take_until0("\n")(input)
 }
 
 #[inline]
