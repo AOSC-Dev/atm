@@ -1,9 +1,9 @@
 use anyhow::{anyhow, Result};
 use std::collections::HashSet;
 use winnow::{
+    ascii::space0,
     bytes::{one_of, tag, take_until0},
-    character::space0,
-    multi::many1,
+    combinator::repeat,
     sequence::{separated_pair, terminated},
     IResult, Parser,
 };
@@ -22,17 +22,17 @@ fn separator(input: &[u8]) -> IResult<&[u8], ()> {
 
 #[inline]
 fn single_line(input: &[u8]) -> IResult<&[u8], &[u8]> {
-    take_until0("\n")(input)
+    take_until0("\n").parse_next(input)
 }
 
 #[inline]
 fn key_value(input: &[u8]) -> IResult<&[u8], (&[u8], &[u8])> {
-    separated_pair(key_name, separator, single_line)(input)
+    separated_pair(key_name, separator, single_line).parse_next(input)
 }
 
 #[inline]
 fn single_package(input: &[u8]) -> IResult<&[u8], Vec<(&[u8], &[u8])>> {
-    many1(terminated(key_value, tag("\n")))(input)
+    repeat(1.., terminated(key_value, tag("\n"))).parse_next(input)
 }
 
 #[inline]
@@ -54,7 +54,7 @@ fn extract_name(input: &[u8]) -> IResult<&[u8], &[u8]> {
 
 #[inline]
 pub fn extract_all_names(input: &[u8]) -> IResult<&[u8], Vec<&[u8]>> {
-    many1(terminated(extract_name, tag("\n")))(input)
+    repeat(1.., terminated(extract_name, tag("\n"))).parse_next(input)
 }
 
 pub fn list_installed(input: &[u8]) -> Result<HashSet<String>> {
