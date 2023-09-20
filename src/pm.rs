@@ -36,7 +36,7 @@ type PreviousTopics = Vec<PreviousTopic>;
 /// Returns the packages need to be reinstalled
 pub fn close_topics(topics: &[TopicManifest]) -> Result<Vec<String>> {
     let state_file = fs::read(DPKG_STATE)?;
-    let installed = list_installed(&state_file)?;
+    let installed = list_installed::<()>(&mut state_file.as_slice())?;
     let mut remove = Vec::new();
 
     for topic in topics {

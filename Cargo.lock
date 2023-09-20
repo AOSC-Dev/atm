@@ -228,7 +228,7 @@ dependencies = [
  "time",
  "tokio",
  "unic-langid",
- "winnow 0.4.11",
+ "winnow",
  "zbus",
 ]
 
@@ -2354,7 +2354,7 @@ checksum = "1b5bb770da30e5cbfde35a2d7b9b8a2c4b8ef89548a7a6aeab5c9a576e3e7421"
 dependencies = [
  "indexmap 2.0.0",
  "toml_datetime",
- "winnow 0.5.15",
+ "winnow",
 ]
 
 [[package]]
@@ -2367,7 +2367,7 @@ dependencies = [
  "serde",
  "serde_spanned",
  "toml_datetime",
- "winnow 0.5.15",
+ "winnow",
 ]
 
 [[package]]
@@ -2717,15 +2717,6 @@ name = "windows_x86_64_msvc"
 version = "0.48.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed94fce61571a4006852b7389a063ab983c02eb1bb37b47f8272ce92d06d9538"
-
-[[package]]
-name = "winnow"
-version = "0.4.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "656953b22bcbfb1ec8179d60734981d1904494ecc91f8a3f0ee5c7389bb8eb4b"
-dependencies = [
- "memchr",
-]
 
 [[package]]
 name = "winnow"
