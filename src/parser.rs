@@ -1,9 +1,10 @@
-use anyhow::{anyhow, Result};
-use std::collections::HashSet;
+use std::fmt::{Debug, Display};
+use std::{collections::HashSet, error::Error};
+use winnow::error::ErrorKind;
 use winnow::{
     ascii::space0,
     combinator::{repeat, separated_pair, terminated},
-    error::{ErrMode, ParserError},
+    error::ParserError,
     token::{one_of, tag, take_until0},
     PResult, Parser,
 };
@@ -63,12 +64,46 @@ pub fn extract_all_names<'a, E: ParserError<&'a [u8]>>(
     repeat(1.., terminated(extract_name, tag("\n"))).parse_next(input)
 }
 
-pub fn list_installed<'a, E: ParserError<&'a [u8]>>(
-    input: &mut &'a [u8],
-) -> Result<HashSet<String>> {
-    let names: Result<Vec<&[u8]>, ErrMode<E>> = extract_all_names(input);
+#[derive(Debug)]
+#[allow(dead_code)]
+pub struct AtmParseError {
+    input: String,
+    kind: winnow::error::ErrorKind,
+}
+
+impl ParserError<&[u8]> for AtmParseError {
+    fn from_error_kind(input: &&[u8], kind: ErrorKind) -> Self {
+        Self {
+            input: String::from_utf8_lossy(input).to_string(),
+            kind,
+        }
+    }
+
+    fn append(self, _: &&[u8], _: ErrorKind) -> Self {
+        self
+    }
+}
+
+impl Display for AtmParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "{self:?}")
+    }
+}
+
+impl Error for AtmParseError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        None
+    }
+
+    fn cause(&self) -> Option<&dyn Error> {
+        self.source()
+    }
+}
+
+pub fn list_installed<'a>(input: &mut &'a [u8]) -> PResult<HashSet<String>, AtmParseError> {
+    let names: PResult<Vec<&[u8]>, AtmParseError> = extract_all_names(input);
     let mut result: HashSet<String> = HashSet::new();
-    for name in names.map_err(|_: ErrMode<_>| anyhow!("Failed to parse dpkg status file"))? {
+    for name in names? {
         if name.is_empty() {
             continue;
         }
