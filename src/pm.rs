@@ -12,7 +12,7 @@ use crate::pk::{
     create_transaction, find_stable_version_of, get_updated_packages, refresh_cache,
     PackageKitProxy,
 };
-use anyhow::Result;
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_reader, to_string};
 
@@ -36,7 +36,10 @@ type PreviousTopics = Vec<PreviousTopic>;
 /// Returns the packages need to be reinstalled
 pub fn close_topics(topics: &[TopicManifest]) -> Result<Vec<String>> {
     let state_file = fs::read(DPKG_STATE)?;
-    let installed = list_installed(&state_file)?;
+    let state_file_slice = &mut state_file.as_slice();
+    let installed = list_installed(state_file_slice)
+        .map_err(|e| e.into_inner().unwrap())
+        .context("Failed to parse dpkg status file")?;
     let mut remove = Vec::new();
 
     for topic in topics {
