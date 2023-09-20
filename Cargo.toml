@@ -13,14 +13,14 @@ serde_json = "1.0"
 lazy_static = "1.4"
 reqwest = { version = "0.11", features = ["json"] }
 winnow = "0.4"
-nix = "0.26"
+nix = { version = "0.27", features = ["user"] }
 tempfile = "3.5"
 sha2 = "0.10"
 # tui
 cursive = { version = "0.20", features = ["crossterm-backend"], default-features = false }
 cursive_table_view = "0.14"
 cursive-async-view = "0.6"
-indexmap = { version ="^1", features = ["serde-1"] }
+indexmap = { version ="^2", features = ["serde"] }
 # cli
 argh = "0.1"
 tabwriter = "^1"
@@ -29,9 +29,9 @@ zbus = "^3"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "fs", "process"] }
 futures = "0.3"
 # i18n
-i18n-embed = { version = "0.13", features = ["fluent-system", "desktop-requester"]}
-i18n-embed-fl = "0.6"
-rust-embed = "^6"
+i18n-embed = { version = "0.14", features = ["fluent-system", "desktop-requester"]}
+i18n-embed-fl = "0.7"
+rust-embed = "^8"
 unic-langid = "0.9"
 
 [profile.release]
