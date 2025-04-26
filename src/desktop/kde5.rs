@@ -1,17 +1,17 @@
 #![allow(non_snake_case)] // for generated code
 
-use zbus::dbus_proxy;
+use zbus::proxy;
 
 // generated code -->
 
-#[dbus_proxy(
+#[proxy(
     interface = "org.kde.JobViewServerV2",
     default_service = "org.kde.kuiserver",
     default_path = "/JobViewServer"
 )]
 trait JobViewServerV2 {
     /// requestView method
-    #[dbus_proxy(name = "requestView")]
+    #[zbus(name = "requestView", object = "JobViewV2")]
     fn request_view(
         &self,
         desktopEntry: &str,
@@ -20,13 +20,13 @@ trait JobViewServerV2 {
     ) -> zbus::Result<zbus::zvariant::OwnedObjectPath>;
 }
 
-#[dbus_proxy(interface = "org.kde.JobViewV2", default_service = "org.kde.kuiserver")]
+#[proxy(interface = "org.kde.JobViewV2", default_service = "org.kde.kuiserver")]
 trait JobViewV2 {
     /// clearDescriptionField method
     fn clear_description_field(&self, number: u32) -> zbus::Result<()>;
 
     /// setDescriptionField method
-    #[dbus_proxy(name = "setDescriptionField")]
+    #[zbus(name = "setDescriptionField")]
     fn set_description_field(&self, number: u32, name: &str, value: &str) -> zbus::Result<bool>;
 
     /// setDestUrl method
@@ -36,11 +36,11 @@ trait JobViewV2 {
     // fn set_error(&self, errorCode: u32) -> zbus::Result<()>;
 
     /// setInfoMessage method
-    #[dbus_proxy(name = "setInfoMessage")]
+    #[zbus(name = "setInfoMessage")]
     fn set_info_message(&self, message: &str) -> zbus::Result<()>;
 
     /// setPercent method
-    #[dbus_proxy(name = "setPercent")]
+    #[zbus(name = "setPercent")]
     fn set_percent(&self, percent: u32) -> zbus::Result<()>;
 
     /// setProcessedAmount method
@@ -56,19 +56,19 @@ trait JobViewV2 {
     fn set_total_amount(&self, amount: u64, unit: &str) -> zbus::Result<()>;
 
     /// terminate method
-    #[dbus_proxy(name = "terminate")]
+    #[zbus(name = "terminate")]
     fn terminate(&self, errorMessage: &str) -> zbus::Result<()>;
 
     /// cancelRequested signal
-    #[dbus_proxy(signal)]
+    #[zbus(signal)]
     fn cancel_requested(&self) -> zbus::Result<()>;
 
     /// resumeRequested signal
-    #[dbus_proxy(signal)]
+    #[zbus(signal)]
     fn resume_requested(&self) -> zbus::Result<()>;
 
     /// suspendRequested signal
-    #[dbus_proxy(signal)]
+    #[zbus(signal)]
     fn suspend_requested(&self) -> zbus::Result<()>;
 }
 
@@ -81,7 +81,7 @@ use anyhow::Result;
 
 pub struct KF5Tracker<'a> {
     async_runner: tokio::runtime::Runtime,
-    pub dbus_connection: zbus::Connection,
+    // pub dbus_connection: zbus::Connection,
     job_proxy: JobViewV2Proxy<'a>,
 }
 
@@ -120,20 +120,19 @@ fn create_async_runner() -> Result<tokio::runtime::Runtime, std::io::Error> {
 impl KF5Tracker<'_> {
     pub fn new(app_id: &str) -> Result<Self> {
         let runner = create_async_runner()?;
-        let (connection, proxy) = runner.block_on(async {
+        let (_, proxy) = runner.block_on(async {
             let conn = zbus::Connection::session().await?;
             let server = JobViewServerV2Proxy::new(&conn).await?;
-            let path = server
+            let proxy = server
                 .request_view(app_id, 0, std::collections::HashMap::new())
                 .await?;
-            let proxy = JobViewV2Proxy::builder(&conn).path(path)?.build().await?;
 
             Ok::<_, anyhow::Error>((conn, proxy))
         })?;
 
         Ok(Self {
             async_runner: runner,
-            dbus_connection: connection,
+            // dbus_connection: connection,
             job_proxy: proxy,
         })
     }

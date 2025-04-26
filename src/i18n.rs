@@ -5,7 +5,6 @@ use i18n_embed::{
 };
 use lazy_static::lazy_static;
 use rust_embed::RustEmbed;
-use unic_langid::LanguageIdentifier;
 
 #[macro_export]
 macro_rules! fl {
@@ -29,13 +28,9 @@ struct Localizations;
 
 fn load_i18n() -> Result<FluentLanguageLoader> {
     let language_loader: FluentLanguageLoader = fluent_language_loader!();
-    let requested_languages = DesktopLanguageRequester::requested_languages();
-    let fallback_language: &[LanguageIdentifier] = &["en-US".parse().unwrap()];
-    let languages: Vec<&LanguageIdentifier> = requested_languages
-        .iter()
-        .chain(fallback_language.iter())
-        .collect();
-    language_loader.load_languages(&Localizations, &languages)?;
+    let mut requested_languages = DesktopLanguageRequester::requested_languages();
+    requested_languages.push("en-US".parse().unwrap());
+    language_loader.load_languages(&Localizations, &requested_languages)?;
 
     Ok(language_loader)
 }

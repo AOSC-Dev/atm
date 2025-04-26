@@ -10,51 +10,13 @@ use futures::StreamExt;
 pub use packagekit::PackageKitProxy;
 use packagekit_tx::TransactionProxy;
 use serde::Deserialize;
-use zbus::{
-    dbus_proxy,
-    export::ordered_stream::OrderedStreamExt,
-    zvariant::{Signature, Type},
-    Connection, Result as zResult,
-};
-
-const PACKAGEKIT_DEST: &str = "org.freedesktop.PackageKit";
+use zbus::{export::ordered_stream::OrderedStreamExt, proxy, Connection, Result as zResult};
 
 #[derive(Deserialize, Debug)]
 pub struct PkPackage {
     pub info: u32,
     pub package_id: String,
     pub summary: String,
-}
-
-impl Type for PkPackage {
-    fn signature() -> zbus::zvariant::Signature<'static> {
-        Signature::from_static_str("(uss)").unwrap()
-    }
-}
-
-#[derive(Deserialize)]
-pub struct PkProgress {
-    pub id: String,
-    pub status: u32,
-    pub percentage: u32,
-}
-
-impl Type for PkProgress {
-    fn signature() -> zbus::zvariant::Signature<'static> {
-        Signature::from_static_str("(suu)").unwrap()
-    }
-}
-
-#[derive(Deserialize)]
-pub struct PkError {
-    pub code: u32,
-    pub details: String,
-}
-
-impl Type for PkError {
-    fn signature() -> zbus::zvariant::Signature<'static> {
-        Signature::from_static_str("(us)").unwrap()
-    }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -74,18 +36,18 @@ pub struct PkTaskList<'a> {
     pub erase: Vec<PkPackgeId<'a>>,
 }
 
-#[dbus_proxy(
+#[proxy(
     interface = "org.freedesktop.UPower",
     default_service = "org.freedesktop.UPower",
     default_path = "/org/freedesktop/UPower"
 )]
 trait UPower {
     /// OnBattery property
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn on_battery(&self) -> zResult<bool>;
 }
 
-#[dbus_proxy(
+#[proxy(
     interface = "org.freedesktop.login1.Manager",
     default_service = "org.freedesktop.login1",
     default_path = "/org/freedesktop/login1"
@@ -160,22 +122,33 @@ async fn wait_for_exit_signal<Fut: Future<Output = zResult<()>>>(
     proxy: &TransactionProxy<'_>,
     func: Fut,
 ) -> Result<()> {
-    let mut signal_stream = proxy.receive_all_signals().await?;
+    // let mut signal_stream = proxy.receive_all_signals().await?;
+    let mut error_signal_stream = proxy.receive_error_code().await?;
+    let mut finish_signal_stream = proxy.receive_finished().await?;
+    let mut destroy_signal_stream = proxy.receive_destroy().await?;
     // poll the future to start the transaction
     func.await?;
-    while let Some(signal) = OrderedStreamExt::next(&mut signal_stream).await {
-        let name = signal.member();
-        if let Some(name) = name {
-            match name.as_str() {
-                "ErrorCode" => {
-                    let e: PkError = signal.body()?;
-                    return Err(anyhow!("({}) {}", e.code, e.details));
-                }
-                "Finished" | "Destroy" => break,
-                _ => continue,
+    tokio::select!{
+        v = async {
+            while let Some(e) = OrderedStreamExt::next(&mut error_signal_stream).await {
+                let args = e.args()?;
+                return Err(anyhow!("({}) {}", args.code, args.details));
             }
-        }
-    }
+            Ok(())
+        } => v,
+        v = async {
+            if let Some(_) = OrderedStreamExt::next(&mut finish_signal_stream).await {
+                return Ok(());
+            }
+            Ok(())
+        } => v,
+        v = async {
+            if let Some(_) = OrderedStreamExt::next(&mut destroy_signal_stream).await {
+                return Ok(());
+            }
+            Ok(())
+        } => v
+    }?;
 
     Ok(())
 }
@@ -185,23 +158,45 @@ async fn collect_packages<Fut: Future<Output = zResult<()>>>(
     func: Fut,
 ) -> Result<Vec<PkPackage>> {
     let mut packages: Vec<PkPackage> = Vec::new();
-    let mut signal_stream = proxy.receive_all_signals().await?;
+    let mut error_signal_stream = proxy.receive_error_code().await?;
+    let mut finish_signal_stream = proxy.receive_finished().await?;
+    let mut destroy_signal_stream = proxy.receive_destroy().await?;
+    let mut package_signal_stream = proxy.receive_package().await?;
+
     // poll the future to start the transaction
     func.await?;
-    while let Some(signal) = OrderedStreamExt::next(&mut signal_stream).await {
-        let name = signal.member();
-        if let Some(name) = name {
-            match name.as_str() {
-                "Package" => packages.push(signal.body()?),
-                "ErrorCode" => {
-                    let e: PkError = signal.body()?;
-                    return Err(anyhow!("({}) {}", e.code, e.details));
-                }
-                "Finished" | "Destroy" => break,
-                _ => continue,
+    tokio::select!{
+        v = async {
+            while let Some(package) = OrderedStreamExt::next(&mut package_signal_stream).await {
+                let args = package.args()?;
+                packages.push(PkPackage {
+                    info: args.info,
+                    package_id: args.package_id.to_string(),
+                    summary: args.summary.to_string(),
+                });
             }
-        }
-    }
+            Ok(())
+        } => v,
+        v = async {
+            while let Some(e) = OrderedStreamExt::next(&mut error_signal_stream).await {
+                let args = e.args()?;
+                return Err(anyhow!("({}) {}", args.code, args.details));
+            }
+            Ok(())
+        } => v,
+        v = async {
+            if let Some(_) = OrderedStreamExt::next(&mut finish_signal_stream).await {
+                return Ok(());
+            }
+            Ok(())
+        } => v,
+        v = async {
+            if let Some(_) = OrderedStreamExt::next(&mut destroy_signal_stream).await {
+                return Ok(());
+            }
+            Ok(())
+        } => v
+    }?;
 
     Ok(packages)
 }
@@ -220,13 +215,7 @@ pub async fn connect_packagekit(conn: &Connection) -> zResult<PackageKitProxy<'_
 pub async fn create_transaction<'a>(
     proxy: &'a PackageKitProxy<'a>,
 ) -> zResult<TransactionProxy<'a>> {
-    let path = proxy.create_transaction().await?;
-
-    TransactionProxy::builder(proxy.connection())
-        .path(path)?
-        .destination(PACKAGEKIT_DEST)?
-        .build()
-        .await
+    proxy.create_transaction().await
 }
 
 /// Refresh repository cache (forcibly refreshes the caches)
@@ -380,33 +369,46 @@ async fn monitor_item_progress<Fut: Future<Output = zResult<()>>>(
     progress_tx: &Sender<PkDisplayProgress>,
     fut: Fut,
 ) -> Result<()> {
-    let mut signal_stream = proxy.receive_all_signals().await?;
+    let mut error_signal_stream = proxy.receive_error_code().await?;
+    let mut finish_signal_stream = proxy.receive_finished().await?;
+    let mut destroy_signal_stream = proxy.receive_destroy().await?;
+    let mut progress_signal_stream = proxy.receive_item_progress().await?;
+
     fut.await?;
-    while let Some(signal) = OrderedStreamExt::next(&mut signal_stream).await {
-        let name = signal.member();
-        if let Some(name) = name {
-            match name.as_str() {
-                // handle individual transaction item (single package progress)
-                "ItemProgress" => {
-                    let item: PkProgress = signal.body()?;
-                    progress_tx.send(PkDisplayProgress::Package(
-                        item.id,
-                        item.status as u8,
-                        item.percentage,
-                    ))?;
-                }
-                "ErrorCode" => {
-                    let e: PkError = signal.body()?;
-                    return Err(anyhow!("({}): {}", e.code, e.details));
-                }
-                "Finished" | "Destroy" => {
-                    progress_tx.send(PkDisplayProgress::Done)?;
-                    return Ok(());
-                }
-                _ => continue,
+    tokio::select! {
+        v = async {
+            while let Some(p) = OrderedStreamExt::next(&mut progress_signal_stream).await {
+                let item = p.args()?;
+                progress_tx.send(PkDisplayProgress::Package(
+                    item.id.to_string(),
+                    item.status as u8,
+                    item.percentage,
+                ))?;
             }
-        }
-    }
+            Ok(())
+        } => v,
+        v = async {
+            while let Some(e) = OrderedStreamExt::next(&mut error_signal_stream).await {
+                let args = e.args()?;
+                return Err(anyhow!("({}) {}", args.code, args.details));
+            }
+            Ok(())
+        } => v,
+        v = async {
+            if let Some(_) = OrderedStreamExt::next(&mut finish_signal_stream).await {
+                progress_tx.send(PkDisplayProgress::Done)?;
+                return Ok(());
+            }
+            Ok(())
+        } => v,
+        v = async {
+            if let Some(_) = OrderedStreamExt::next(&mut destroy_signal_stream).await {
+                progress_tx.send(PkDisplayProgress::Done)?;
+                return Ok(());
+            }
+            Ok(())
+        } => v
+    }?;
 
     Ok(())
 }

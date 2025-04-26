@@ -19,18 +19,22 @@
 //!
 //! …consequently `zbus-xmlgen` did not generate code for the above interfaces.
 
-use zbus::dbus_proxy;
+use zbus::proxy;
 
-#[dbus_proxy(
+use crate::pk::TransactionProxy;
+
+#[proxy(
     interface = "org.freedesktop.PackageKit",
     default_service = "org.freedesktop.PackageKit",
-    default_path = "/org/freedesktop/PackageKit"
+    default_path = "/org/freedesktop/PackageKit",
+    assume_defaults = true
 )]
-trait PackageKit {
+pub trait PackageKit {
     /// CanAuthorize method
     fn can_authorize(&self, action_id: &str) -> zbus::Result<u32>;
 
     /// CreateTransaction method
+    #[zbus(object = "Transaction")]
     fn create_transaction(&self) -> zbus::Result<zbus::zvariant::OwnedObjectPath>;
 
     /// GetDaemonState method
@@ -72,70 +76,70 @@ trait PackageKit {
     fn suggest_daemon_quit(&self) -> zbus::Result<()>;
 
     /// RepoListChanged signal
-    #[dbus_proxy(signal)]
+    #[zbus(signal)]
     fn repo_list_changed(&self) -> zbus::Result<()>;
 
     /// RestartSchedule signal
-    #[dbus_proxy(signal)]
+    #[zbus(signal)]
     fn restart_schedule(&self) -> zbus::Result<()>;
 
     /// TransactionListChanged signal
-    #[dbus_proxy(signal)]
+    #[zbus(signal)]
     fn transaction_list_changed(&self, transactions: Vec<&str>) -> zbus::Result<()>;
 
     /// UpdatesChanged signal
-    #[dbus_proxy(signal)]
+    #[zbus(signal)]
     fn updates_changed(&self) -> zbus::Result<()>;
 
     /// BackendAuthor property
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn backend_author(&self) -> zbus::Result<String>;
 
     /// BackendDescription property
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn backend_description(&self) -> zbus::Result<String>;
 
     /// BackendName property
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn backend_name(&self) -> zbus::Result<String>;
 
     /// DistroId property
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn distro_id(&self) -> zbus::Result<String>;
 
     /// Filters property
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn filters(&self) -> zbus::Result<u64>;
 
     /// Groups property
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn groups(&self) -> zbus::Result<u64>;
 
     /// Locked property
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn locked(&self) -> zbus::Result<bool>;
 
     /// MimeTypes property
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn mime_types(&self) -> zbus::Result<Vec<String>>;
 
     /// NetworkState property
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn network_state(&self) -> zbus::Result<u32>;
 
     /// Roles property
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn roles(&self) -> zbus::Result<u64>;
 
     /// VersionMajor property
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn version_major(&self) -> zbus::Result<u32>;
 
     /// VersionMicro property
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn version_micro(&self) -> zbus::Result<u32>;
 
     /// VersionMinor property
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn version_minor(&self) -> zbus::Result<u32>;
 }

@@ -10,13 +10,13 @@
 //! section of the zbus documentation.
 //!
 
-use zbus::dbus_proxy;
+use zbus::proxy;
 
-#[dbus_proxy(
+#[proxy(
     interface = "org.freedesktop.PackageKit.Transaction",
     default_service = "org.freedesktop.PackageKit"
 )]
-trait Transaction {
+pub trait Transaction {
     /// AcceptEula method
     fn accept_eula(&self, eula_id: &str) -> zbus::Result<()>;
 
@@ -136,7 +136,7 @@ trait Transaction {
     fn what_provides(&self, filter: u64, values: &[&str]) -> zbus::Result<()>;
 
     /// Category signal
-    #[dbus_proxy(signal)]
+    #[zbus(signal)]
     fn category(
         &self,
         parent_id: &str,
@@ -147,26 +147,26 @@ trait Transaction {
     ) -> zbus::Result<()>;
 
     /// Destroy signal
-    #[dbus_proxy(signal)]
+    #[zbus(signal)]
     fn destroy(&self) -> zbus::Result<()>;
 
     /// Details signal
-    #[dbus_proxy(signal)]
+    #[zbus(signal)]
     fn details(
         &self,
         data: std::collections::HashMap<&str, zbus::zvariant::Value<'_>>,
     ) -> zbus::Result<()>;
 
     /// DistroUpgrade signal
-    #[dbus_proxy(signal)]
+    #[zbus(signal)]
     fn distro_upgrade(&self, type_: u32, name: &str, summary: &str) -> zbus::Result<()>;
 
     /// ErrorCode signal
-    #[dbus_proxy(signal)]
+    #[zbus(signal)]
     fn error_code(&self, code: u32, details: &str) -> zbus::Result<()>;
 
     /// EulaRequired signal
-    #[dbus_proxy(signal)]
+    #[zbus(signal)]
     fn eula_required(
         &self,
         eula_id: &str,
@@ -176,19 +176,19 @@ trait Transaction {
     ) -> zbus::Result<()>;
 
     /// Files signal
-    #[dbus_proxy(signal)]
+    #[zbus(signal)]
     fn files(&self, package_id: &str, file_list: Vec<&str>) -> zbus::Result<()>;
 
     /// Finished signal
-    #[dbus_proxy(signal)]
+    #[zbus(signal)]
     fn finished(&self, exit: u32, runtime: u32) -> zbus::Result<()>;
 
     /// ItemProgress signal
-    #[dbus_proxy(signal)]
+    #[zbus(signal)]
     fn item_progress(&self, id: &str, status: u32, percentage: u32) -> zbus::Result<()>;
 
     /// MediaChangeRequired signal
-    #[dbus_proxy(signal)]
+    #[zbus(signal)]
     fn media_change_required(
         &self,
         media_type: u32,
@@ -197,15 +197,15 @@ trait Transaction {
     ) -> zbus::Result<()>;
 
     /// Package signal
-    #[dbus_proxy(signal)]
+    #[zbus(signal)]
     fn package(&self, info: u32, package_id: &str, summary: &str) -> zbus::Result<()>;
 
     /// RepoDetail signal
-    #[dbus_proxy(signal)]
+    #[zbus(signal)]
     fn repo_detail(&self, repo_id: &str, description: &str, enabled: bool) -> zbus::Result<()>;
 
     /// RepoSignatureRequired signal
-    #[dbus_proxy(signal)]
+    #[zbus(signal)]
     fn repo_signature_required(
         &self,
         package_id: &str,
@@ -219,11 +219,11 @@ trait Transaction {
     ) -> zbus::Result<()>;
 
     /// RequireRestart signal
-    #[dbus_proxy(signal)]
+    #[zbus(signal)]
     fn require_restart(&self, type_: u32, package_id: &str) -> zbus::Result<()>;
 
     /// Transaction signal
-    #[dbus_proxy(signal)]
+    #[zbus(signal)]
     fn transaction(
         &self,
         object_path: zbus::zvariant::ObjectPath<'_>,
@@ -237,7 +237,7 @@ trait Transaction {
     ) -> zbus::Result<()>;
 
     /// UpdateDetail signal
-    #[dbus_proxy(signal)]
+    #[zbus(signal)]
     fn update_detail(
         &self,
         package_id: &str,
@@ -255,50 +255,50 @@ trait Transaction {
     ) -> zbus::Result<()>;
 
     /// AllowCancel property
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn allow_cancel(&self) -> zbus::Result<bool>;
 
     /// CallerActive property
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn caller_active(&self) -> zbus::Result<bool>;
 
     /// DownloadSizeRemaining property
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn download_size_remaining(&self) -> zbus::Result<u64>;
 
     /// ElapsedTime property
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn elapsed_time(&self) -> zbus::Result<u32>;
 
     /// LastPackage property
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn last_package(&self) -> zbus::Result<String>;
 
     /// Percentage property
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn percentage(&self) -> zbus::Result<u32>;
 
     /// RemainingTime property
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn remaining_time(&self) -> zbus::Result<u32>;
 
     /// Role property
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn role(&self) -> zbus::Result<u32>;
 
     /// Speed property
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn speed(&self) -> zbus::Result<u32>;
 
     /// Status property
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn status(&self) -> zbus::Result<u32>;
 
     /// TransactionFlags property
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn transaction_flags(&self) -> zbus::Result<u64>;
 
     /// Uid property
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn uid(&self) -> zbus::Result<u32>;
 }

@@ -1,6 +1,3 @@
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::rc::Rc;
 use std::sync::Arc;
 use std::thread;
 
@@ -11,6 +8,7 @@ use cursive::{views::Dialog, Cursive, CursiveRunnable};
 use anyhow::Result;
 use cursive_async_view::AsyncView;
 use cursive_table_view::{TableView, TableViewItem};
+use dashmap::DashMap;
 
 use super::cli::privileged_write_source_list;
 use super::format_timestamp;
@@ -18,7 +16,7 @@ use crate::network::{TopicManifest, TopicManifests};
 use crate::pk::{self, PkPackage, PkTaskList};
 use crate::{fl, network, pm};
 
-type MarksMap = HashMap<String, bool>;
+type MarksMap = DashMap<String, bool>;
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 enum TopicColumn {
@@ -124,7 +122,7 @@ fn show_finished(siv: &mut Cursive) {
     show_message(siv, &fl!("apt_finished"));
 }
 
-fn check_network(siv: &mut Cursive, marks: Rc<RefCell<MarksMap>>) {
+fn check_network(siv: &mut Cursive, marks: Arc<MarksMap>) {
     let ctx = siv.user_data::<TUIContext>().unwrap();
     if !ctx.async_runner.block_on(async {
         pk::is_metered_network(&ctx.dbus_connection)
@@ -147,7 +145,7 @@ fn check_network(siv: &mut Cursive, marks: Rc<RefCell<MarksMap>>) {
     );
 }
 
-fn check_battery_level(siv: &mut Cursive, marks: Rc<RefCell<MarksMap>>) {
+fn check_battery_level(siv: &mut Cursive, marks: Arc<MarksMap>) {
     let ctx = siv.user_data::<TUIContext>().unwrap();
     if !ctx.async_runner.block_on(async {
         pk::is_using_battery(&ctx.dbus_connection)
@@ -300,7 +298,7 @@ fn commit_transactions(siv: &mut Cursive, packages: &[PkPackage]) {
     });
 }
 
-fn show_summary(tasks: PkTaskList, packages: Rc<Vec<PkPackage>>) -> Dialog {
+fn show_summary(tasks: PkTaskList, packages: Arc<Vec<PkPackage>>) -> Dialog {
     let mut summary = String::with_capacity(128);
     let details = show_tx_details(&tasks);
     let updates = tasks.upgrade.len();
@@ -382,10 +380,10 @@ fn calculate_changes(siv: &mut Cursive, reinstall: TopicManifests) {
             })
         },
         |(nf, tx)| {
-            let tx = Rc::new(tx);
+            let tx = Arc::new(tx);
             let details = pk::get_task_details(&nf, &tx);
             match details {
-                Ok(details) => show_summary(details, Rc::clone(&tx)),
+                Ok(details) => show_summary(details, Arc::clone(&tx)),
                 Err(e) => Dialog::around(TextView::new(fl!("pk_invalid_id", name = e.to_string())))
                     .title(fl!("error"))
                     .button(fl!("exit"), |s| s.quit())
@@ -396,7 +394,7 @@ fn calculate_changes(siv: &mut Cursive, reinstall: TopicManifests) {
     siv.add_layer(loader);
 }
 
-fn check_changes(siv: &mut Cursive, marks: Rc<RefCell<MarksMap>>) {
+fn check_changes(siv: &mut Cursive, marks: Arc<MarksMap>) {
     let cb_sink = siv.cb_sink().clone();
     let ctx = siv.user_data::<TUIContext>().unwrap();
     let mirror_url = ctx.mirror_url.clone();
@@ -405,7 +403,7 @@ fn check_changes(siv: &mut Cursive, marks: Rc<RefCell<MarksMap>>) {
         "topic",
         |v: &mut TableView<network::TopicManifest, TopicColumn>| {
             let items = v.borrow_items();
-            let marks_ref = RefCell::borrow(&marks);
+            let marks_ref = &marks;
             let mut enabled = Vec::with_capacity(marks_ref.len());
             let mut reinstall = Vec::with_capacity(marks_ref.len());
 
@@ -415,20 +413,19 @@ fn check_changes(siv: &mut Cursive, marks: Rc<RefCell<MarksMap>>) {
                     continue;
                 }
                 if let Some(enable) = marks_ref.get(&item.name) {
-                    if !enable {
+                    if !*enable {
                         reinstall.push(item.clone());
                     }
                 }
             }
 
-            drop(marks_ref); // end the immutable borrow here so that we can mutate it later
             if let Err(e) = privileged_write_source_list(&enabled, &mirror_url) {
                 let message = e.to_string();
                 cb_sink
                     .send(Box::new(move |s| show_error(s, &message)))
                     .unwrap();
             } else {
-                RefCell::borrow_mut(&marks).clear();
+                marks.clear();
                 cb_sink
                     .send(Box::new(|s| {
                         calculate_changes(s, reinstall);
@@ -440,9 +437,9 @@ fn check_changes(siv: &mut Cursive, marks: Rc<RefCell<MarksMap>>) {
 }
 
 fn build_topic_list_view(siv: &mut Cursive, manifest: Vec<TopicManifest>) {
-    let map = HashMap::<String, bool>::with_capacity(std::cmp::min(manifest.len(), 10));
-    let marks = Rc::new(RefCell::new(map));
-    let marks_table = Rc::clone(&marks);
+    let map = DashMap::<String, bool>::with_capacity(std::cmp::min(manifest.len(), 10));
+    let marks = Arc::new(map);
+    let marks_table = Arc::clone(&marks);
     let has_closed = manifest.iter().any(|x| x.closed);
     let table_height = siv.screen_size().y.checked_sub(14).unwrap_or(4);
 
@@ -465,11 +462,10 @@ fn build_topic_list_view(siv: &mut Cursive, manifest: Vec<TopicManifest>) {
                     if let Some(item) = v.borrow_item_mut(index) {
                         item.enabled = !item.enabled;
                         // update tracking information
-                        if RefCell::borrow(&marks_table).contains_key(&item.name) {
-                            RefCell::borrow_mut(&marks_table).remove(&item.name);
+                        if marks_table.contains_key(&item.name) {
+                            marks_table.remove(&item.name);
                         } else {
-                            RefCell::borrow_mut(&marks_table)
-                                .insert(item.name.clone(), item.enabled);
+                            marks_table.insert(item.name.clone(), item.enabled);
                         }
                         v.needs_relayout();
                     }

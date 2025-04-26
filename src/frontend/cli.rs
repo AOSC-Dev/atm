@@ -106,6 +106,7 @@ pub fn privileged_write_source_list(
         .args(&["refresh", "-c", chksum.as_str(), "-m", mirror_url, "-f"])
         .arg(f.path())
         .stderr(Stdio::piped())
+        .stdout(Stdio::null())
         .spawn()
         .map_err(|_| anyhow!(fl!("sudo-failure")))?
         .wait_with_output()?;
