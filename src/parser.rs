@@ -112,9 +112,9 @@ fn test_key_value() {
 
 #[test]
 fn test_package() {
-    let mut test = &b"Package: zsync\nVersion: 0.6.2-1\nStatus: install ok installed\nArchitecture: amd64\nInstalled-Size: 256\n\n"[..];
+    let test = &b"Package: zsync\nVersion: 0.6.2-1\nStatus: install ok installed\nArchitecture: amd64\nInstalled-Size: 256\n\n"[..];
     assert_eq!(
-        single_package(&mut test),
+        single_package(&mut test.as_ref()),
         Ok(vec![
             (&b"Package"[..], &b"zsync"[..]),
             (&b"Version"[..], &b"0.6.2-1"[..]),
@@ -123,7 +123,7 @@ fn test_package() {
             (&b"Installed-Size"[..], &b"256"[..])
         ])
     );
-    assert_eq!(extract_name(&mut test), Ok(&b"zsync"[..]));
+    assert_eq!(extract_name(&mut test.as_ref()), Ok(&b"zsync"[..]));
 }
 
 #[test]
